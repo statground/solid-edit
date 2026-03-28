@@ -1,61 +1,57 @@
 # SolidEdit
 
-> A reliable, offline-first rich text editor that runs directly from a
-> single HTML file.
+> 단일 HTML 파일로 바로 실행 가능한 오프라인 리치 텍스트 에디터
 
 ------------------------------------------------------------------------
 
 ## 🌐 Language
 
--   English (this file)
--   [한국어 README 보기](./README.ko.md)
+-   [English README 보기](./README.md)
+-   한국어 (이 파일)
 
 ------------------------------------------------------------------------
 
-## ✨ Overview
+## ✨ 개요
 
-SolidEdit is a lightweight yet powerful rich text editor designed to
-work fully offline.
+SolidEdit는 오프라인에서 바로 실행 가능한 리치 텍스트 에디터입니다.
 
--   No build step
--   No server required
--   Works via file://
--   Stable and predictable
+-   빌드 없음
+-   서버 없음
+-   file:// 실행 가능
+-   안정적인 동작
 
 ------------------------------------------------------------------------
 
-## 🚀 Features
+## 🚀 주요 기능
 
--   Rich text editing
+-   리치 텍스트 편집
 -   Markdown
--   LaTeX math
--   Code blocks (highlight)
--   Image (base64 + compression)
--   Tables
+-   LaTeX 수식
+-   코드 블록 하이라이트
+-   이미지 (base64 + 압축)
+-   표
 -   Inspector
--   Auto-save
+-   자동 저장
 
 ------------------------------------------------------------------------
 
-## 📦 Installation
+## 📦 설치
 
-### 1. Direct
+### 1. 직접 실행
 
-Download: - index.html - editor.js
-
-Run: file:///path/to/index.html
+index.html, editor.js 다운로드 후 실행
 
 ------------------------------------------------------------------------
 
 ### 2. jsDelivr CDN
 
-#### Latest
+#### 최신 버전
 
 ``` html
 <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@latest/editor.js"></script>
 ```
 
-#### Version 0.0.1
+#### 0.0.1 버전
 
 ``` html
 <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.1/editor.js"></script>
@@ -63,25 +59,22 @@ Run: file:///path/to/index.html
 
 ------------------------------------------------------------------------
 
-## ⚙️ Usage
+## ⚙️ 사용 방법
 
-``` html
-<div id="app"></div>
-<script>
-  SolidEdit.init({
-    container: "#app"
-  });
-</script>
+``` javascript
+SolidEdit.init({
+  container: "#app"
+});
 ```
 
 ------------------------------------------------------------------------
 
-## 📄 License
+## 📄 라이선스
 
 MIT
 
 ------------------------------------------------------------------------
 
-## Author
+## 제작
 
 Statground
