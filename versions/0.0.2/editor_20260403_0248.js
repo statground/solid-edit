@@ -2703,6 +2703,49 @@ if (typeof window !== 'undefined') {
     return wrapper.firstElementChild || null;
   }
 
+  function hasVisibleAdvancedRibbonGroups(editor) {
+    if (!editor || !editor.root) return false;
+    return Array.from(editor.root.querySelectorAll('.lre-group[data-ribbon-group="advanced"]')).some(function(group){
+      return group.getAttribute('data-embed-empty') !== 'true' && group.hidden !== true;
+    });
+  }
+
+  function syncRibbonControls(editor) {
+    const button = editor && editor.root ? editor.root.querySelector('[data-ribbon-toggle]') : null;
+    if (!button) return;
+    const buttonGroup = button.closest('.lre-group');
+    const hasAdvanced = hasVisibleAdvancedRibbonGroups(editor);
+    if (buttonGroup) buttonGroup.hidden = !hasAdvanced;
+    const expanded = hasAdvanced && !!(editor.state && editor.state.ribbonExpanded);
+    editor.root.classList.toggle('lre-ribbon-expanded', expanded);
+    button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    button.setAttribute('title', expanded ? 'Hide extra tools' : 'Show extra tools');
+    button.setAttribute('aria-label', expanded ? 'Hide extra tools' : 'Show extra tools');
+    const label = button.querySelector('.lre-ribbon-toggle-label');
+    if (label) label.textContent = expanded ? 'Hide tools' : 'Show tools';
+  }
+
+  function ensureRibbonControls(editor, options) {
+    if (!editor || !editor.root) return;
+    editor.state = editor.state || {};
+    if (typeof editor.state.ribbonExpanded !== 'boolean') {
+      editor.state.ribbonExpanded = !!(options && options.ribbonExpanded);
+    }
+    const button = editor.root.querySelector('[data-ribbon-toggle]');
+    if (!button) return;
+    if (!editor.__ribbonControlsInstalled) {
+      button.addEventListener('click', function(event){
+        event.preventDefault();
+        event.stopPropagation();
+        editor.state.ribbonExpanded = !editor.state.ribbonExpanded;
+        syncRibbonControls(editor);
+        if (typeof editor.updateLayout === 'function') editor.updateLayout();
+      });
+      editor.__ribbonControlsInstalled = true;
+    }
+    syncRibbonControls(editor);
+  }
+
   function resolveMountTarget(options) {
     const target = options && (options.target || options.mount || options.host || options.container);
     if (!target) return null;
@@ -5323,6 +5366,21 @@ if (typeof window !== 'undefined') {
       if (this.latexContent) this.latexContent.textContent = latex.dataset.latex || '';
     };
 
+    proto.getCodeElementFromNode = function getCodeElementFromNodePatched(node) {
+      if (!node) return null;
+      const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+      if (!element) return null;
+      const codeNode = element.closest('.lre-code-node');
+      if (codeNode && this.editor && this.editor.contains(codeNode)) {
+        const nestedPre = codeNode.querySelector('pre');
+        const normalized = this.normalizeCodeBlock ? this.normalizeCodeBlock(nestedPre) : (nestedPre ? nestedPre.querySelector('code') : null);
+        if (normalized) return normalized;
+      }
+      const pre = element.closest('pre');
+      if (!pre || !this.editor || !this.editor.contains(pre)) return null;
+      return this.normalizeCodeBlock ? this.normalizeCodeBlock(pre) : pre.querySelector('code');
+    };
+
     proto.showCodeInspector = function showCodeInspectorPatched(code) {
       hideInspectorSections(this);
       if (!code || !this.codeInspector) return;
@@ -6851,4 +6909,1385 @@ if (typeof window !== 'undefined') {
   }
 
   window.initStatkissContentEditor = initStatkissContentEditor;
+})();
+
+
+/* StatKISS embedded editor final host patch: centered inline dialogs, dark theme sync, math/code/inspector fixes. */
+(function(){
+  'use strict';
+
+  const BUILD = '20260403-statkiss-final-01';
+  const STYLE_ID = 'statkiss-solid-editor-final-style';
+  const LINK_DIALOG_ID = 'lreHostLinkDialog';
+
+  function waitForEditor(callback) {
+    const resolve = function() {
+      const editor = window.__localRichEditor || window.localRichEditor || null;
+      if (!editor) return false;
+      callback(editor);
+      return true;
+    };
+    if (resolve()) return;
+    let tries = 0;
+    const timer = setInterval(function(){
+      tries += 1;
+      if (resolve() || tries > 360) clearInterval(timer);
+    }, 50);
+    window.addEventListener('local-rich-editor:ready', function(){
+      if (resolve()) clearInterval(timer);
+    }, { once: true });
+  }
+
+  function icon(paths, viewBox) {
+    return '<svg class="lre-icon" viewBox="' + (viewBox || '0 0 24 24') + '" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9">' + paths + '</svg>';
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function clamp(value, min, max) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return min;
+    return Math.max(min, Math.min(max, number));
+  }
+
+  function normalizeLangName(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return 'plaintext';
+    const map = {
+      auto: 'auto',
+      text: 'plaintext',
+      txt: 'plaintext',
+      plaintext: 'plaintext',
+      plain: 'plaintext',
+      js: 'javascript',
+      mjs: 'javascript',
+      ts: 'typescript',
+      py: 'python',
+      sh: 'bash',
+      shell: 'bash',
+      yml: 'yaml',
+      tex: 'latex',
+      formula: 'latex'
+    };
+    return map[raw] || raw;
+  }
+
+  function getElement(node) {
+    if (!node) return null;
+    return node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  }
+
+  function isHostDark() {
+    const root = document.documentElement;
+    const body = document.body;
+    const htmlTheme = String(root && root.getAttribute('data-theme') || '').toLowerCase();
+    const bodyTheme = String(body && body.getAttribute('data-theme') || '').toLowerCase();
+    return !!(
+      (body && body.classList.contains('lre-dark')) ||
+      (body && body.classList.contains('dark')) ||
+      (root && root.classList.contains('dark')) ||
+      htmlTheme === 'dark' ||
+      bodyTheme === 'dark'
+    );
+  }
+
+  function ensureStyle() {
+    let style = document.getElementById(STYLE_ID);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = STYLE_ID;
+      document.head.appendChild(style);
+    }
+    style.textContent = `
+      .lre-root.lre-embedded-content [data-action="toggle-dark"],
+      .lre-root.lre-embedded-content [data-bubble-action="toggle-dark"],
+      .lre-root.lre-embedded-content [data-action="comment"],
+      .lre-root.lre-embedded-content [data-bubble-action="comment"],
+      .lre-root.lre-embedded-content .lre-comment-list,
+      .lre-root.lre-embedded-content #lreCommentList {
+        display: none !important;
+      }
+      .lre-root.lre-embedded-content .lre-btn[data-format="h1"] svg,
+      .lre-root.lre-embedded-content .lre-btn[data-format="h2"] svg,
+      .lre-root.lre-embedded-content .lre-btn[data-format="h3"] svg,
+      .lre-root.lre-embedded-content .lre-btn[data-action="h1"] svg,
+      .lre-root.lre-embedded-content .lre-btn[data-action="h2"] svg,
+      .lre-root.lre-embedded-content .lre-btn[data-action="h3"] svg {
+        width: 24px !important;
+        height: 24px !important;
+        stroke-width: 2.1 !important;
+      }
+      .lre-root.lre-embedded-content .lre-dialog[open],
+      .lre-root.lre-embedded-content .lre-host-inline-dialog[open] {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        right: auto !important;
+        bottom: auto !important;
+        transform: translate(-50%, -50%) !important;
+        margin: 0 !important;
+        width: min(760px, calc(100vw - 24px)) !important;
+        max-width: calc(100vw - 24px) !important;
+        max-height: calc(100vh - 24px) !important;
+      }
+      .lre-root.lre-embedded-content .lre-dialog .lre-dialog-card,
+      .lre-root.lre-embedded-content .lre-host-inline-dialog .lre-dialog-card {
+        border-radius: 18px !important;
+      }
+      .lre-root.lre-embedded-content .lre-color-popover {
+        width: min(320px, calc(100vw - 24px)) !important;
+        padding: 16px !important;
+        border-radius: 18px !important;
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        right: auto !important;
+        bottom: auto !important;
+        transform: translate(-50%, -50%) !important;
+        z-index: 90 !important;
+      }
+      .lre-root.lre-embedded-content .lre-color-popover.is-open {
+        display: grid !important;
+      }
+      .lre-root.lre-embedded-content .table-picker-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 88 !important;
+        background: rgba(15, 23, 42, 0.12) !important;
+        backdrop-filter: blur(6px) !important;
+      }
+      .lre-root.lre-embedded-content .table-picker-pop {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        right: auto !important;
+        bottom: auto !important;
+        transform: translate(-50%, -50%) !important;
+        width: min(340px, calc(100vw - 24px)) !important;
+        max-width: calc(100vw - 24px) !important;
+        min-width: 0 !important;
+        z-index: 89 !important;
+      }
+      .lre-root.lre-embedded-content .lre-code-node {
+        overflow: hidden;
+      }
+      .lre-root.lre-embedded-content .lre-code-node .lre-code-head {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+        padding: 10px 12px 0 !important;
+      }
+      .lre-root.lre-embedded-content .lre-code-node .lre-code-head .lre-chip {
+        display: inline-flex !important;
+        align-items: center !important;
+        min-height: 26px !important;
+      }
+      .lre-root.lre-embedded-content .lre-code-toggle {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 32px !important;
+        height: 32px !important;
+        min-width: 32px !important;
+        min-height: 32px !important;
+        padding: 0 !important;
+      }
+      .lre-root.lre-embedded-content .lre-code-toggle svg {
+        width: 18px !important;
+        height: 18px !important;
+      }
+      .lre-root.lre-embedded-content .lre-code-node.is-collapsed pre {
+        display: none !important;
+      }
+      .lre-root.lre-embedded-content .lre-code-node.is-collapsed {
+        padding-bottom: 10px !important;
+      }
+      .lre-root.lre-embedded-content .lre-math-node {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+      }
+      .lre-root.lre-embedded-content .lre-math-node.block {
+        display: flex;
+        justify-content: center;
+        min-height: 56px;
+        padding: 14px 18px;
+      }
+      body.lre-dark .lre-root.lre-embedded-content,
+      .lre-root.lre-embedded-content.lre-host-dark {
+        color: #e5edf9 !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content #lreEmbedToolbarHost,
+      body.lre-dark .lre-root.lre-embedded-content .lre-editor-page,
+      body.lre-dark .lre-root.lre-embedded-content .lre-statusbar,
+      body.lre-dark .lre-root.lre-embedded-content .lre-panel,
+      body.lre-dark .lre-root.lre-embedded-content .lre-source-card,
+      body.lre-dark .lre-root.lre-embedded-content .lre-searchbar,
+      body.lre-dark .lre-root.lre-embedded-content .lre-color-popover,
+      body.lre-dark .lre-root.lre-embedded-content .lre-dialog-card,
+      body.lre-dark .lre-root.lre-embedded-content .table-picker-pop,
+      .lre-root.lre-embedded-content.lre-host-dark #lreEmbedToolbarHost,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-editor-page,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-statusbar,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-panel,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-source-card,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-searchbar,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-color-popover,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-dialog-card,
+      .lre-root.lre-embedded-content.lre-host-dark .table-picker-pop {
+        background: #0b1324 !important;
+        color: #e5edf9 !important;
+        border-color: #22314c !important;
+        box-shadow: 0 20px 48px rgba(2, 6, 23, 0.36) !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content .lre-btn,
+      body.lre-dark .lre-root.lre-embedded-content input,
+      body.lre-dark .lre-root.lre-embedded-content select,
+      body.lre-dark .lre-root.lre-embedded-content textarea,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-btn,
+      .lre-root.lre-embedded-content.lre-host-dark input,
+      .lre-root.lre-embedded-content.lre-host-dark select,
+      .lre-root.lre-embedded-content.lre-host-dark textarea {
+        color: #e5edf9 !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content input,
+      body.lre-dark .lre-root.lre-embedded-content select,
+      body.lre-dark .lre-root.lre-embedded-content textarea,
+      .lre-root.lre-embedded-content.lre-host-dark input,
+      .lre-root.lre-embedded-content.lre-host-dark select,
+      .lre-root.lre-embedded-content.lre-host-dark textarea {
+        background: #09101d !important;
+        border-color: #22314c !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content .lre-editor-page,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-editor-page {
+        background: #0d1425 !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content .lre-editor-page [contenteditable="true"],
+      .lre-root.lre-embedded-content.lre-host-dark .lre-editor-page [contenteditable="true"] {
+        color: #e5edf9 !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content .lre-code-node,
+      body.lre-dark .lre-root.lre-embedded-content .lre-image-node,
+      body.lre-dark .lre-root.lre-embedded-content .lre-math-node.block,
+      body.lre-dark .lre-root.lre-embedded-content table,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-code-node,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-image-node,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-math-node.block,
+      .lre-root.lre-embedded-content.lre-host-dark table {
+        background: #0a1220 !important;
+        border-color: #22314c !important;
+        color: #e5edf9 !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content pre,
+      body.lre-dark .lre-root.lre-embedded-content code,
+      .lre-root.lre-embedded-content.lre-host-dark pre,
+      .lre-root.lre-embedded-content.lre-host-dark code {
+        background: transparent !important;
+        color: #e5edf9 !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content .lre-code-node .lre-chip,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-code-node .lre-chip {
+        background: rgba(96, 165, 250, 0.14) !important;
+        color: #bfdbfe !important;
+        border: 1px solid rgba(96, 165, 250, 0.24) !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content .lre-math-node,
+      body.lre-dark .lre-root.lre-embedded-content .lre-math-node svg,
+      body.lre-dark .lre-root.lre-embedded-content .lre-math-node mjx-container,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-math-node,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-math-node svg,
+      .lre-root.lre-embedded-content.lre-host-dark .lre-math-node mjx-container {
+        color: #e5edf9 !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content .lre-math-node [fill]:not([fill="none"]),
+      .lre-root.lre-embedded-content.lre-host-dark .lre-math-node [fill]:not([fill="none"]) {
+        fill: currentColor !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content .lre-math-node [stroke]:not([stroke="none"]),
+      .lre-root.lre-embedded-content.lre-host-dark .lre-math-node [stroke]:not([stroke="none"]) {
+        stroke: currentColor !important;
+      }
+      body.lre-dark .lre-root.lre-embedded-content .table-picker-overlay,
+      .lre-root.lre-embedded-content.lre-host-dark .table-picker-overlay {
+        background: rgba(2, 6, 23, 0.42) !important;
+      }
+      @media (max-width: 720px) {
+        .lre-root.lre-embedded-content .table-picker-pop,
+        .lre-root.lre-embedded-content .lre-color-popover,
+        .lre-root.lre-embedded-content .lre-dialog[open],
+        .lre-root.lre-embedded-content .lre-host-inline-dialog[open] {
+          width: calc(100vw - 20px) !important;
+          max-width: calc(100vw - 20px) !important;
+        }
+      }
+    `;
+  }
+
+  function syncDarkState(editor) {
+    if (!editor || !editor.root) return;
+    const dark = isHostDark();
+    editor.root.classList.toggle('lre-host-dark', dark);
+    if (editor.state) editor.state.dark = dark;
+    editor.root.querySelectorAll('[data-action="toggle-dark"], [data-bubble-action="toggle-dark"]').forEach(function(button){
+      button.remove();
+    });
+    editor.root.querySelectorAll('[data-action="comment"], [data-bubble-action="comment"]').forEach(function(button){
+      button.remove();
+    });
+  }
+
+  function getImageNode(node) {
+    const element = getElement(node);
+    return element ? element.closest('.lre-image-node, figure.image-figure') : null;
+  }
+
+  function getTableNode(node) {
+    const element = getElement(node);
+    return element ? element.closest('table') : null;
+  }
+
+  function normalizeMathNode(node) {
+    const element = getElement(node);
+    const math = element ? element.closest('.lre-math-node, .latex-node') : null;
+    if (!math) return null;
+    math.classList.remove('latex-node');
+    math.classList.add('lre-math-node');
+    const tex = math.dataset.tex != null ? math.dataset.tex : (math.dataset.latex != null ? math.dataset.latex : '');
+    math.dataset.tex = String(tex || '');
+    if (math.dataset.latex != null) delete math.dataset.latex;
+    math.removeAttribute('data-latex');
+    if (math.dataset.display == null) {
+      math.dataset.display = math.classList.contains('block') ? 'true' : 'false';
+    }
+    math.classList.toggle('block', math.dataset.display === 'true');
+    math.classList.toggle('inline', math.dataset.display !== 'true');
+    math.dataset.type = 'math';
+    math.contentEditable = 'false';
+    return math;
+  }
+
+  function getCodeFigure(node) {
+    const element = getElement(node);
+    if (!element) return null;
+    return element.closest('.lre-code-node') || null;
+  }
+
+  function createCodeToggleIcon(collapsed) {
+    return collapsed
+      ? icon('<path d="m9 6 6 6-6 6"/>')
+      : icon('<path d="m6 9 6 6 6-6"/>');
+  }
+
+  function ensureCodeFigure(figure) {
+    if (!figure) return null;
+    figure.classList.add('lre-code-node');
+    figure.dataset.type = 'code';
+
+    let head = figure.querySelector('.lre-code-head');
+    if (!head) {
+      head = document.createElement('div');
+      head.className = 'lre-code-head';
+      figure.insertBefore(head, figure.firstChild || null);
+    }
+
+    let chip = head.querySelector('.lre-chip');
+    if (!chip) {
+      chip = document.createElement('span');
+      chip.className = 'lre-chip';
+      head.appendChild(chip);
+    }
+
+    let toggle = head.querySelector('.lre-code-toggle');
+    if (!toggle) {
+      toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'lre-btn lre-code-toggle';
+      head.appendChild(toggle);
+    }
+
+    let pre = figure.querySelector('pre');
+    if (!pre) {
+      pre = document.createElement('pre');
+      figure.appendChild(pre);
+    }
+    let code = pre.querySelector('code');
+    if (!code) {
+      code = document.createElement('code');
+      pre.appendChild(code);
+    }
+
+    const language = normalizeLangName(figure.dataset.language || code.dataset.language || pre.dataset.language || 'plaintext');
+    const raw = figure.dataset.code != null ? String(figure.dataset.code) : String(code.dataset.rawCode != null ? code.dataset.rawCode : (code.textContent || ''));
+    figure.dataset.language = language;
+    figure.dataset.code = raw;
+    code.dataset.language = language;
+    code.dataset.rawCode = raw;
+    pre.dataset.language = language;
+    code.contentEditable = 'false';
+    code.setAttribute('spellcheck', 'false');
+    code.setAttribute('autocapitalize', 'off');
+    code.setAttribute('autocorrect', 'off');
+
+    const collapsed = figure.dataset.collapsed === 'true';
+    figure.classList.toggle('is-collapsed', collapsed);
+    pre.hidden = collapsed;
+    chip.textContent = language;
+    toggle.innerHTML = createCodeToggleIcon(collapsed) + '<span class="lre-sr">' + escapeHtml(collapsed ? 'Expand code block' : 'Collapse code block') + '</span>';
+    toggle.setAttribute('aria-label', collapsed ? 'Expand code block' : 'Collapse code block');
+    toggle.setAttribute('title', collapsed ? 'Expand code block' : 'Collapse code block');
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+    return { figure: figure, head: head, chip: chip, toggle: toggle, pre: pre, code: code, language: language, raw: raw };
+  }
+
+  function countLines(text) {
+    const value = String(text || '');
+    if (!value) return 0;
+    return value.split(/\r?\n/).length;
+  }
+
+  function ensureSelectOption(select, value) {
+    if (!select || !value) return;
+    const exists = Array.from(select.options || []).some(function(option){ return option.value === value; });
+    if (!exists) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      select.appendChild(option);
+    }
+  }
+
+  function ensureMathJaxReadyLocal() {
+    return new Promise(function(resolve){
+      const ready = function() {
+        const mj = window.MathJax;
+        if (mj && typeof mj.tex2svgPromise === 'function') {
+          if (mj.startup && mj.startup.promise && typeof mj.startup.promise.then === 'function') {
+            mj.startup.promise.then(function(){ resolve(mj); }).catch(function(){ resolve(mj); });
+          } else {
+            resolve(mj);
+          }
+          return true;
+        }
+        return false;
+      };
+      if (ready()) return;
+      let tries = 0;
+      const timer = setInterval(function(){
+        tries += 1;
+        if (ready() || tries > 240) {
+          clearInterval(timer);
+          resolve(window.MathJax || null);
+        }
+      }, 25);
+    });
+  }
+
+  function ensureLinkDialog(editor) {
+    if (editor.__hostLinkDialog) return editor.__hostLinkDialog;
+    const dialog = document.createElement('dialog');
+    dialog.id = LINK_DIALOG_ID;
+    dialog.className = 'lre-dialog lre-host-inline-dialog';
+    dialog.innerHTML = `
+      <div class="lre-dialog-card">
+        <div class="lre-dialog-head">
+          <h2>Link</h2>
+          <button class="lre-btn" type="button" data-link-close="true">${icon('<path d="M6 6l12 12"/><path d="M18 6 6 18"/>')}<span class="lre-sr">Close</span></button>
+        </div>
+        <div class="lre-dialog-body">
+          <div class="lre-dialog-grid">
+            <label class="lre-field">URL<input id="lreHostLinkUrl" type="url" placeholder="https://"></label>
+            <label class="lre-field">Text<input id="lreHostLinkText" type="text" placeholder="Link text"></label>
+          </div>
+        </div>
+        <div class="lre-actions">
+          <button class="lre-btn" type="button" data-link-close="true">${icon('<path d="M6 6l12 12"/><path d="M18 6 6 18"/>')}<span class="lre-sr">Cancel</span></button>
+          <button class="lre-btn lre-primary" type="button" data-link-save="true">${icon('<path d="M5 12l4 4L19 6"/><path d="M5 5h8"/><path d="M5 19h14"/>')}<span class="lre-sr">Insert link</span></button>
+        </div>
+      </div>`;
+    editor.root.appendChild(dialog);
+    const urlInput = dialog.querySelector('#lreHostLinkUrl');
+    const textInput = dialog.querySelector('#lreHostLinkText');
+
+    const close = function() {
+      try { dialog.close(); } catch (error) { dialog.removeAttribute('open'); }
+      editor.__hostPendingLink = null;
+    };
+
+    dialog.querySelectorAll('[data-link-close="true"]').forEach(function(button){
+      button.addEventListener('click', function(event){
+        event.preventDefault();
+        close();
+      });
+    });
+
+    dialog.querySelector('[data-link-save="true"]').addEventListener('click', function(event){
+      event.preventDefault();
+      const payload = editor.__hostPendingLink || {};
+      const url = String(urlInput.value || '').trim();
+      const label = String(textInput.value || '').trim() || url;
+      if (!url) {
+        urlInput.focus();
+        return;
+      }
+      if (typeof editor.restoreSelection === 'function') editor.restoreSelection();
+      if (payload.hasSelection) {
+        try {
+          document.execCommand('createLink', false, url);
+        } catch (error) {
+          editor.insertHTML('<a href="' + escapeHtml(url) + '">' + escapeHtml(label) + '</a>');
+        }
+      } else {
+        editor.insertHTML('<a href="' + escapeHtml(url) + '">' + escapeHtml(label) + '</a>');
+      }
+      editor.markDirty?.();
+      editor.updateSourceView?.();
+      editor.updateStatus?.();
+      close();
+    });
+
+    dialog.addEventListener('close', function(){ editor.__hostPendingLink = null; });
+    dialog.__openFor = function(payload) {
+      editor.__hostPendingLink = payload || {};
+      urlInput.value = String((payload && payload.url) || 'https://');
+      textInput.value = String((payload && payload.text) || '');
+      try { dialog.showModal(); } catch (error) { dialog.setAttribute('open', 'open'); }
+      setTimeout(function(){ urlInput.focus(); urlInput.select(); }, 0);
+    };
+
+    editor.__hostLinkDialog = dialog;
+    return dialog;
+  }
+
+  function hideInspectorSections(editor) {
+    [editor.imageInspector, editor.tableInspector, editor.latexInspector, editor.codeInspector].forEach(function(section){
+      if (section) {
+        section.hidden = true;
+        section.classList.remove('active-inspector');
+      }
+    });
+    if (editor.nodeInspector) editor.nodeInspector.hidden = true;
+    const removeBtn = editor.root.querySelector('[data-action="remove-selected-node"], [data-action="delete-node"]');
+    if (removeBtn) removeBtn.hidden = true;
+  }
+
+  function patchEditor(editor) {
+    if (!editor || editor.__statkissFinalApplied) {
+      if (editor) {
+        syncDarkState(editor);
+        editor.renderAllMath?.();
+        editor.highlightAllCodeBlocks?.();
+      }
+      return;
+    }
+    editor.__statkissFinalApplied = true;
+    ensureStyle();
+    syncDarkState(editor);
+
+    const proto = Object.getPrototypeOf(editor);
+    const originalHandleAction = proto.handleAction;
+    const originalOpenCodeDialogForNode = proto.openCodeDialogForNode;
+    const originalCreateCodeNode = proto.createCodeNode;
+    const originalRenderCodeNode = proto.renderCodeNode;
+    const originalRenderHighlightedCodeElement = proto.renderHighlightedCodeElement;
+    const originalShowImageInspector = proto.showImageInspector;
+    const originalShowTableInspector = proto.showTableInspector;
+
+    proto.comments = [];
+    editor.comments = [];
+    proto.updateCommentList = function statkissNoComments() {
+      this.comments = [];
+      if (this.commentList) this.commentList.innerHTML = '';
+    };
+    editor.updateCommentList?.();
+
+    proto.insertTablePrompt = function statkissInsertTablePrompt() {
+      this.showTablePicker();
+    };
+
+    proto.insertLink = function statkissInsertLink() {
+      const dialog = ensureLinkDialog(this);
+      const sel = window.getSelection();
+      const text = sel && sel.rangeCount ? sel.toString() : '';
+      if (typeof this.saveSelection === 'function') this.saveSelection();
+      dialog.__openFor({ hasSelection: !!text, text: text || '', url: 'https://' });
+    };
+
+    proto.addComment = function statkissDisabledComment() {
+      return;
+    };
+
+    proto.openColorPopover = function statkissOpenColorPopover(button, mode, title) {
+      this.activeColorMode = mode;
+      if (this.colorPopoverTitle) this.colorPopoverTitle.textContent = title;
+      if (!this.colorPopover) return;
+      this.colorPopover.classList.add('is-open');
+    };
+
+    proto.closeColorPopover = function statkissCloseColorPopover() {
+      if (this.colorPopover) this.colorPopover.classList.remove('is-open');
+    };
+
+    proto.showTablePicker = function statkissShowTablePicker() {
+      const overlay = this.root.querySelector('#tablePickerOverlay');
+      if (!overlay) return;
+      overlay.hidden = false;
+      overlay.classList.add('is-open');
+      const size = overlay.querySelector('#tablePickerSize');
+      if (size && !overlay.dataset.rows) size.textContent = '3 × 3';
+    };
+
+    proto.hideTablePicker = function statkissHideTablePicker() {
+      const overlay = this.root.querySelector('#tablePickerOverlay');
+      if (!overlay) return;
+      overlay.hidden = true;
+      overlay.classList.remove('is-open');
+    };
+
+    proto.getSelectedImageNode = function statkissGetSelectedImageNode() {
+      const selected = this.selectedNode;
+      return selected && (selected.classList?.contains('lre-image-node') || selected.classList?.contains('image-figure')) ? selected : null;
+    };
+
+    proto.getSelectedTable = function statkissGetSelectedTable() {
+      const selected = this.selectedNode;
+      return selected && selected.tagName === 'TABLE' ? selected : null;
+    };
+
+    proto.getSelectedMathNode = function statkissGetSelectedMathNode() {
+      return normalizeMathNode(this.selectedNode);
+    };
+
+    proto.getSelectedCodeNode = function statkissGetSelectedCodeNode() {
+      return getCodeFigure(this.selectedNode);
+    };
+
+    proto.getActiveCell = function statkissGetActiveCell() {
+      if (this.__activeTableCell && this.selectedNode && this.selectedNode.contains(this.__activeTableCell)) {
+        return this.__activeTableCell;
+      }
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return null;
+      let node = sel.getRangeAt(0).startContainer;
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+      const cell = node && node.closest ? node.closest('td,th') : null;
+      if (cell) this.__activeTableCell = cell;
+      return cell;
+    };
+
+    proto.showImageInspector = function statkissShowImageInspector(node) {
+      hideInspectorSections(this);
+      if (originalShowImageInspector) originalShowImageInspector.call(this, node);
+      if (this.nodeInspector) this.nodeInspector.hidden = false;
+      if (this.imageInspector) {
+        this.imageInspector.hidden = false;
+        this.imageInspector.classList.add('active-inspector');
+      }
+      const removeBtn = this.root.querySelector('[data-action="remove-selected-node"], [data-action="delete-node"]');
+      if (removeBtn) removeBtn.hidden = false;
+    };
+
+    proto.showTableInspector = function statkissShowTableInspector(table) {
+      hideInspectorSections(this);
+      if (originalShowTableInspector) originalShowTableInspector.call(this, table);
+      if (this.nodeInspector) this.nodeInspector.hidden = false;
+      if (this.tableInspector) {
+        this.tableInspector.hidden = false;
+        this.tableInspector.classList.add('active-inspector');
+      }
+      const rows = table && table.rows ? table.rows.length : 0;
+      const cols = rows && table.rows[0] ? table.rows[0].cells.length : 0;
+      if (this.tableLocation) this.tableLocation.textContent = rows + ' rows × ' + cols + ' columns';
+      const removeBtn = this.root.querySelector('[data-action="remove-selected-node"], [data-action="delete-node"]');
+      if (removeBtn) removeBtn.hidden = false;
+    };
+
+    proto.showLatexInspector = function statkissShowLatexInspector(node) {
+      const math = normalizeMathNode(node);
+      hideInspectorSections(this);
+      if (!math) return;
+      if (this.nodeInspector) this.nodeInspector.hidden = false;
+      if (this.latexInspector) {
+        this.latexInspector.hidden = false;
+        this.latexInspector.classList.add('active-inspector');
+      }
+      if (this.latexContent) this.latexContent.textContent = math.dataset.tex || '';
+      const removeBtn = this.root.querySelector('[data-action="remove-selected-node"], [data-action="delete-node"]');
+      if (removeBtn) removeBtn.hidden = false;
+    };
+
+    proto.openMathDialogForNode = function statkissOpenMathDialogForNode(node) {
+      const math = normalizeMathNode(node);
+      if (!math || !this.mathDialog) return;
+      this.selectNode(math);
+      this.editingMathNode = math;
+      if (this.mathDialogDisplay) this.mathDialogDisplay.value = math.dataset.display === 'true' ? 'block' : 'inline';
+      if (this.mathDialogText) this.mathDialogText.value = math.dataset.tex || '';
+      try { this.mathDialog.showModal(); } catch (error) { this.mathDialog.setAttribute('open', 'open'); }
+    };
+
+    proto.openMathDialogForSelected = function statkissOpenMathDialogForSelected() {
+      const node = this.getSelectedMathNode();
+      if (node) this.openMathDialogForNode(node);
+    };
+
+    proto.saveMathDialog = function statkissSaveMathDialog() {
+      const display = this.mathDialogDisplay && this.mathDialogDisplay.value === 'block';
+      const tex = String(this.mathDialogText && this.mathDialogText.value || '').trim();
+      if (!tex) {
+        try { this.mathDialog.close(); } catch (error) { this.mathDialog.removeAttribute('open'); }
+        this.editingMathNode = null;
+        return;
+      }
+      let node = this.editingMathNode ? normalizeMathNode(this.editingMathNode) : null;
+      if (!node) {
+        node = document.createElement(display ? 'div' : 'span');
+        node.className = 'lre-math-node ' + (display ? 'block' : 'inline');
+        node.contentEditable = 'false';
+        node.dataset.type = 'math';
+        this.insertNode(node);
+      }
+      node.dataset.tex = tex;
+      node.dataset.display = String(!!display);
+      node.classList.toggle('block', !!display);
+      node.classList.toggle('inline', !display);
+      this.renderMathNode(node);
+      this.selectNode(node);
+      try { this.mathDialog.close(); } catch (error) { this.mathDialog.removeAttribute('open'); }
+      this.editingMathNode = null;
+      this.markDirty?.();
+      this.updateSourceView?.();
+      this.updateStatus?.();
+    };
+
+    proto.renderMathNode = async function statkissRenderMathNode(node) {
+      const math = normalizeMathNode(node);
+      if (!math) return null;
+      const tex = String(math.dataset.tex || '').trim();
+      const display = math.dataset.display === 'true' || math.classList.contains('block');
+      math.classList.toggle('block', !!display);
+      math.classList.toggle('inline', !display);
+      math.classList.remove('is-error');
+      if (!tex) {
+        math.innerHTML = display ? '<span>\\[ \\]</span>' : '<span>\( \)</span>';
+        return math;
+      }
+      const mj = await ensureMathJaxReadyLocal();
+      if (!mj || typeof mj.tex2svgPromise !== 'function') {
+        math.textContent = display ? '$$' + tex + '$$' : '$' + tex + '$';
+        math.classList.add('is-error');
+        return math;
+      }
+      try {
+        const rendered = await mj.tex2svgPromise(tex, { display: !!display });
+        math.innerHTML = '';
+        if (rendered instanceof Element) math.appendChild(rendered);
+        else if (rendered && typeof rendered.outerHTML === 'string') math.innerHTML = rendered.outerHTML;
+      } catch (error) {
+        math.classList.add('is-error');
+        math.textContent = display ? '$$' + tex + '$$' : '$' + tex + '$';
+      }
+      if (this.selectedNode === math) this.showLatexInspector(math);
+      return math;
+    };
+
+    proto.renderAllMath = function statkissRenderAllMath() {
+      if (this.editor) {
+        this.editor.querySelectorAll('.lre-math-node, .latex-node').forEach((node) => { this.renderMathNode(node); });
+      }
+      const preview = this.root.querySelector('#markdownPreview, #lreSourcePreview');
+      if (preview) {
+        preview.querySelectorAll('.lre-math-node, .latex-node').forEach((node) => { this.renderMathNode(node); });
+      }
+    };
+
+    proto.renderMath = function statkissRenderMathAlias() {
+      return this.renderAllMath();
+    };
+
+    proto.createCodeNode = function statkissCreateCodeNode(lang, code) {
+      const figure = originalCreateCodeNode ? originalCreateCodeNode.call(this, normalizeLangName(lang), String(code || '')) : document.createElement('figure');
+      if (!figure.classList.contains('lre-code-node')) {
+        figure.className = 'lre-code-node';
+        figure.contentEditable = 'false';
+        figure.dataset.type = 'code';
+        figure.innerHTML = '<div class="lre-code-head"><span class="lre-chip"></span></div><pre><code></code></pre>';
+      }
+      figure.dataset.language = normalizeLangName(lang || 'plaintext');
+      figure.dataset.code = String(code || '');
+      ensureCodeFigure(figure);
+      return figure;
+    };
+
+    proto.renderCodeNode = function statkissRenderCodeNode(node) {
+      const figure = getCodeFigure(node) || node;
+      const parts = ensureCodeFigure(figure);
+      if (!parts) return null;
+      figure.dataset.language = normalizeLangName(figure.dataset.language || parts.code.dataset.language || 'plaintext');
+      figure.dataset.code = figure.dataset.code != null ? String(figure.dataset.code) : String(parts.code.dataset.rawCode || parts.code.textContent || '');
+      parts.code.dataset.rawCode = figure.dataset.code;
+      parts.code.textContent = figure.dataset.code;
+      parts.code.dataset.language = figure.dataset.language;
+      parts.pre.dataset.language = figure.dataset.language;
+      if (originalRenderCodeNode) {
+        try { originalRenderCodeNode.call(this, figure); } catch (error) {}
+      }
+      parts.code.dataset.rawCode = figure.dataset.code;
+      parts.code.textContent = figure.dataset.code;
+      if (originalRenderHighlightedCodeElement) {
+        try { originalRenderHighlightedCodeElement.call(this, parts.code); } catch (error) {}
+      }
+      const collapsed = figure.dataset.collapsed === 'true';
+      figure.classList.toggle('is-collapsed', collapsed);
+      parts.pre.hidden = collapsed;
+      parts.chip.textContent = figure.dataset.language;
+      parts.toggle.innerHTML = createCodeToggleIcon(collapsed) + '<span class="lre-sr">' + escapeHtml(collapsed ? 'Expand code block' : 'Collapse code block') + '</span>';
+      parts.toggle.setAttribute('aria-label', collapsed ? 'Expand code block' : 'Collapse code block');
+      parts.toggle.setAttribute('title', collapsed ? 'Expand code block' : 'Collapse code block');
+      parts.toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      return figure;
+    };
+
+    proto.openCodeDialogForNode = function statkissOpenCodeDialogForNode(node) {
+      const figure = getCodeFigure(node);
+      if (!figure || !this.codeDialog) return;
+      ensureCodeFigure(figure);
+      this.selectNode(figure);
+      this.editingCodeNode = figure;
+      if (this.codeDialogLang) this.codeDialogLang.value = normalizeLangName(figure.dataset.language || 'plaintext');
+      if (this.codeDialogText) this.codeDialogText.value = String(figure.dataset.code || '');
+      try { this.codeDialog.showModal(); } catch (error) { this.codeDialog.setAttribute('open', 'open'); }
+    };
+
+    proto.openCodeDialogForSelected = function statkissOpenCodeDialogForSelected() {
+      const figure = this.getSelectedCodeNode();
+      if (figure) this.openCodeDialogForNode(figure);
+    };
+
+    proto.saveCodeDialog = function statkissSaveCodeDialog() {
+      const lang = normalizeLangName(this.codeDialogLang && this.codeDialogLang.value || 'plaintext');
+      const raw = String(this.codeDialogText && this.codeDialogText.value || '');
+      let figure = this.editingCodeNode ? getCodeFigure(this.editingCodeNode) : null;
+      if (!figure) {
+        figure = this.createCodeNode(lang, raw);
+        this.insertNode(figure);
+      }
+      figure.dataset.language = lang;
+      figure.dataset.code = raw;
+      this.renderCodeNode(figure);
+      this.selectNode(figure);
+      try { this.codeDialog.close(); } catch (error) { this.codeDialog.removeAttribute('open'); }
+      this.editingCodeNode = null;
+      this.markDirty?.();
+      this.updateSourceView?.();
+      this.updateStatus?.();
+    };
+
+    proto.showCodeInspector = function statkissShowCodeInspector(node) {
+      const figure = getCodeFigure(node);
+      if (!figure || !this.codeInspector) return;
+      hideInspectorSections(this);
+      const parts = ensureCodeFigure(figure);
+      const language = normalizeLangName(figure.dataset.language || parts.code.dataset.language || 'plaintext');
+      if (this.nodeInspector) this.nodeInspector.hidden = false;
+      this.codeInspector.hidden = false;
+      this.codeInspector.classList.add('active-inspector');
+      if (this.codeLanguageSelect) {
+        ensureSelectOption(this.codeLanguageSelect, language);
+        this.codeLanguageSelect.value = language;
+      }
+      if (this.codeInfo) {
+        const lines = countLines(figure.dataset.code || '');
+        this.codeInfo.textContent = language + ' · ' + lines + ' line' + (lines === 1 ? '' : 's');
+      }
+      const removeBtn = this.root.querySelector('[data-action="remove-selected-node"], [data-action="delete-node"]');
+      if (removeBtn) removeBtn.hidden = false;
+    };
+
+    proto.updateSelectedCodeLanguage = function statkissUpdateSelectedCodeLanguage() {
+      const figure = this.getSelectedCodeNode();
+      if (!figure || !this.codeLanguageSelect) return;
+      figure.dataset.language = normalizeLangName(this.codeLanguageSelect.value || 'plaintext');
+      this.renderCodeNode(figure);
+      this.showCodeInspector(figure);
+      this.markDirty?.();
+      this.updateSourceView?.();
+      this.updateStatus?.();
+      this.scheduleSave?.();
+    };
+
+    proto.refreshSelectedCode = function statkissRefreshSelectedCode() {
+      const figure = this.getSelectedCodeNode();
+      if (!figure) return;
+      this.renderCodeNode(figure);
+      this.showCodeInspector(figure);
+      this.markDirty?.();
+      this.updateSourceView?.();
+      this.updateStatus?.();
+    };
+
+    proto.updateInspector = function statkissUpdateInspector() {
+      const image = this.getSelectedImageNode();
+      const table = this.getSelectedTable();
+      const math = this.getSelectedMathNode();
+      const code = this.getSelectedCodeNode();
+      hideInspectorSections(this);
+      let visible = false;
+      if (image) {
+        this.showImageInspector(image);
+        visible = true;
+      } else if (table) {
+        this.showTableInspector(table);
+        visible = true;
+      } else if (math) {
+        this.showLatexInspector(math);
+        visible = true;
+      } else if (code) {
+        this.showCodeInspector(code);
+        visible = true;
+      }
+      const panel = this.root.querySelector('#inspectorPanel, .panel.right');
+      if (panel) panel.hidden = !visible;
+      this.root.classList.toggle('show-inspector', !!visible);
+      if (!visible && this.nodeInspector) this.nodeInspector.hidden = true;
+    };
+
+    proto.handleEditorClick = function statkissHandleEditorClick(event) {
+      const taskBox = event.target.closest && event.target.closest('.task-box');
+      if (taskBox) {
+        const checked = taskBox.dataset.checked === 'true';
+        taskBox.dataset.checked = String(!checked);
+        taskBox.textContent = checked ? '☐' : '☑';
+        this.scheduleSave?.();
+        return;
+      }
+      const codeFigure = getCodeFigure(event.target);
+      const imageNode = getImageNode(event.target);
+      const mathNode = normalizeMathNode(event.target);
+      const tableNode = getTableNode(event.target);
+      const tableCell = getElement(event.target) && getElement(event.target).closest ? getElement(event.target).closest('td,th') : null;
+      if (tableCell) this.__activeTableCell = tableCell;
+      if (codeFigure) {
+        this.selectNode(codeFigure);
+        return;
+      }
+      if (imageNode) {
+        this.selectNode(imageNode);
+        return;
+      }
+      if (mathNode) {
+        this.selectNode(mathNode);
+        return;
+      }
+      if (tableNode) {
+        this.selectNode(tableNode);
+        return;
+      }
+      this.clearNodeSelection?.();
+    };
+
+    proto.handleEditorDoubleClick = function statkissHandleEditorDoubleClick(event) {
+      const codeFigure = getCodeFigure(event.target);
+      const mathNode = normalizeMathNode(event.target);
+      if (codeFigure) {
+        this.openCodeDialogForNode(codeFigure);
+        return;
+      }
+      if (mathNode) {
+        this.openMathDialogForNode(mathNode);
+      }
+    };
+
+    proto.updateSelectedContextFromSelection = function statkissUpdateSelectedContextFromSelection() {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      if (!this.editor.contains(range.commonAncestorContainer)) {
+        this.hideSlashMenu?.(true);
+        this.hideBubbleToolbar?.();
+        return;
+      }
+      let node = range.startContainer;
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+      const image = getImageNode(node);
+      const code = getCodeFigure(node);
+      const math = normalizeMathNode(node);
+      const table = getTableNode(node);
+      const tableCell = node && node.closest ? node.closest('td,th') : null;
+      if (tableCell) this.__activeTableCell = tableCell;
+      if (image || code || math || table) this.selectNode(image || code || math || table);
+    };
+
+    proto.handleAction = function statkissHandleAction(action, button) {
+      if (action === 'toggle-dark' || action === 'comment') return;
+      if (action === 'link') {
+        this.insertLink();
+        return;
+      }
+      if (action === 'table') {
+        this.showTablePicker(button);
+        return;
+      }
+      if (action === 'edit-latex') {
+        this.openMathDialogForSelected();
+        return;
+      }
+      return originalHandleAction.call(this, action, button);
+    };
+
+    editor.root.addEventListener('click', function(event){
+      const toggle = event.target.closest && event.target.closest('.lre-code-toggle');
+      if (!toggle) return;
+      const figure = toggle.closest('.lre-code-node');
+      if (!figure) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const collapsed = figure.dataset.collapsed === 'true';
+      figure.dataset.collapsed = String(!collapsed);
+      proto.renderCodeNode.call(editor, figure);
+      editor.selectNode?.(figure);
+      editor.markDirty?.();
+      editor.updateSourceView?.();
+      editor.updateStatus?.();
+      editor.scheduleSave?.();
+    }, true);
+
+    document.addEventListener('mousedown', function(event){
+      const popover = editor.colorPopover;
+      const toolbarButton = editor.root.querySelector('[data-action="text-color"], [data-action="bg-color"]');
+      if (popover && popover.classList.contains('is-open')) {
+        if (!popover.contains(event.target) && !(toolbarButton && toolbarButton.contains(event.target))) {
+          editor.closeColorPopover?.();
+        }
+      }
+    }, true);
+
+    const removeCommentSection = function() {
+      editor.root.querySelectorAll('[data-action="comment"], [data-bubble-action="comment"]').forEach(function(button){ button.remove(); });
+      editor.root.querySelectorAll('.lre-comment-list, #lreCommentList').forEach(function(el){
+        const section = el.closest('.section, .lre-inspector-section');
+        if (section) section.remove();
+      });
+    };
+
+    removeCommentSection();
+    syncDarkState(editor);
+
+    const syncDark = function() { syncDarkState(editor); };
+    const observer = new MutationObserver(syncDark);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+    if (document.body) observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+    editor.__statkissDarkObserver = observer;
+
+    editor.root.querySelectorAll('.lre-code-node').forEach(function(figure){ proto.renderCodeNode.call(editor, figure); });
+    editor.root.querySelectorAll('.latex-node, .lre-math-node').forEach(function(node){ normalizeMathNode(node); });
+    proto.renderAllMath.call(editor);
+    editor.highlightAllCodeBlocks?.();
+    editor.updateInspector?.();
+
+    try { console.info('[LocalRichEditor]', BUILD, 'applied'); } catch (error) {}
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function(){ waitForEditor(patchEditor); }, { once: true });
+  } else {
+    waitForEditor(patchEditor);
+  }
+})();
+
+(function(){
+  'use strict';
+  function waitForEditor(callback){
+    const hit = function(){
+      const editor = window.__localRichEditor || window.localRichEditor || null;
+      if (!editor) return false;
+      callback(editor);
+      return true;
+    };
+    if (hit()) return;
+    let tries = 0;
+    const timer = setInterval(function(){
+      tries += 1;
+      if (hit() || tries > 360) clearInterval(timer);
+    }, 50);
+  }
+  function getElement(node){ return node ? (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement) : null; }
+  function getCodeFigure(node){ const el = getElement(node); return el ? el.closest('.lre-code-node') : null; }
+  function getImageNode(node){ const el = getElement(node); return el ? el.closest('.lre-image-node, figure.image-figure') : null; }
+  function getTableNode(node){ const el = getElement(node); return el ? el.closest('table') : null; }
+  function normalizeMathNode(node){
+    const el = getElement(node);
+    const math = el ? el.closest('.lre-math-node, .latex-node') : null;
+    if (!math) return null;
+    math.classList.remove('latex-node');
+    math.classList.add('lre-math-node');
+    math.dataset.tex = String(math.dataset.tex != null ? math.dataset.tex : (math.dataset.latex != null ? math.dataset.latex : ''));
+    if (math.dataset.display == null) math.dataset.display = math.classList.contains('block') ? 'true' : 'false';
+    math.classList.toggle('block', math.dataset.display === 'true');
+    math.classList.toggle('inline', math.dataset.display !== 'true');
+    math.contentEditable = 'false';
+    return math;
+  }
+  function ensureCodeFigure(figure){
+    if (!figure) return null;
+    let pre = figure.querySelector('pre');
+    if (!pre) { pre = document.createElement('pre'); figure.appendChild(pre); }
+    let code = pre.querySelector('code');
+    if (!code) { code = document.createElement('code'); pre.appendChild(code); }
+    code.dataset.rawCode = figure.dataset.code != null ? String(figure.dataset.code) : String(code.dataset.rawCode != null ? code.dataset.rawCode : (code.textContent || ''));
+    return code;
+  }
+  waitForEditor(function(editor){
+    const proto = Object.getPrototypeOf(editor);
+    if (proto.__statkissFinalFollowupApplied) return;
+    proto.__statkissFinalFollowupApplied = true;
+    const originalShowCodeInspector = proto.showCodeInspector;
+    proto.showCodeInspector = function followupShowCodeInspector(node){
+      const figure = getCodeFigure(node);
+      const code = ensureCodeFigure(figure);
+      if (code && this.state) this.state.selectedCodeBlock = code;
+      return originalShowCodeInspector.call(this, figure || node);
+    };
+    proto.refreshSelectedCodeBlock = function followupRefreshSelectedCodeBlock(){
+      const figure = this.getSelectedCodeNode ? this.getSelectedCodeNode() : getCodeFigure(this.selectedNode || (this.state && this.state.selectedCodeBlock));
+      if (!figure) return;
+      if (typeof this.renderCodeNode === 'function') this.renderCodeNode(figure);
+      if (typeof this.showCodeInspector === 'function') this.showCodeInspector(figure);
+      this.scheduleSave?.();
+    };
+    proto.prepareCodeBlockForEditing = function followupPrepareCodeBlockForEditing(code){
+      const figure = getCodeFigure(code) || (this.getSelectedCodeNode && this.getSelectedCodeNode());
+      if (!figure) return;
+      if (typeof this.openCodeDialogForNode === 'function') this.openCodeDialogForNode(figure);
+    };
+    proto.finalizeCodeBlockEditing = function followupFinalizeCodeBlockEditing(code){
+      const figure = getCodeFigure(code);
+      const rawCode = ensureCodeFigure(figure);
+      if (!figure || !rawCode) return;
+      figure.dataset.code = String(rawCode.dataset.rawCode != null ? rawCode.dataset.rawCode : (rawCode.textContent || ''));
+      if (typeof this.renderCodeNode === 'function') this.renderCodeNode(figure);
+      if (typeof this.showCodeInspector === 'function') this.showCodeInspector(figure);
+      this.scheduleSave?.();
+    };
+    proto.detectSelectedNode = function followupDetectSelectedNode(){
+      const sel = window.getSelection();
+      const anchor = sel && sel.rangeCount ? sel.getRangeAt(0).startContainer : null;
+      const element = getElement(anchor);
+      const target = getCodeFigure(element) || getImageNode(element) || normalizeMathNode(element) || getTableNode(element);
+      const cell = element && element.closest ? element.closest('td,th') : null;
+      if (cell) this.__activeTableCell = cell;
+      if (target) {
+        if (this.selectedNode && this.selectedNode !== target && this.selectedNode.classList) this.selectedNode.classList.remove('is-selected');
+        this.selectedNode = target;
+        if (target.classList) target.classList.add('is-selected');
+      }
+      if (typeof this.updateInspector === 'function') this.updateInspector();
+    };
+    editor.root.addEventListener('mouseup', function(){ setTimeout(function(){ editor.detectSelectedNode?.(); }, 0); }, true);
+    document.addEventListener('selectionchange', function(){
+      const sel = document.getSelection();
+      if (sel && editor.root.contains(sel.anchorNode)) editor.detectSelectedNode?.();
+    }, true);
+    editor.detectSelectedNode?.();
+  });
+})();
+
+
+/* StatKISS completion patch: inspector/table reliability + code fold control + source refresh. */
+(function(){
+  'use strict';
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  if (window.__STATKISS_SOLID_EDITOR_COMPLETION_PATCH__) return;
+  window.__STATKISS_SOLID_EDITOR_COMPLETION_PATCH__ = true;
+
+  function waitForEditor(callback) {
+    const resolve = function() {
+      const editor = window.__localRichEditor || window.localRichEditor || null;
+      if (!editor) return false;
+      callback(editor);
+      return true;
+    };
+    if (resolve()) return;
+    let tries = 0;
+    const timer = setInterval(function(){
+      tries += 1;
+      if (resolve() || tries > 360) clearInterval(timer);
+    }, 50);
+    window.addEventListener('local-rich-editor:ready', function(){
+      if (resolve()) clearInterval(timer);
+    }, { once: true });
+  }
+
+  function getElement(node) {
+    if (!node) return null;
+    return node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  }
+
+  function getCodeFigure(node) {
+    const element = getElement(node);
+    return element ? element.closest('.lre-code-node') : null;
+  }
+
+  function getTableNode(node) {
+    const element = getElement(node);
+    return element ? element.closest('table') : null;
+  }
+
+  function icon(paths, viewBox) {
+    return '<svg class="lre-icon" viewBox="' + (viewBox || '0 0 24 24') + '" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9">' + paths + '</svg>';
+  }
+
+  function markChanged(editor) {
+    if (!editor) return;
+    try { editor.markDirty && editor.markDirty(); } catch (error) {}
+    try { editor.updateSourceView && editor.updateSourceView(); } catch (error) {}
+    try { editor.updateStatus && editor.updateStatus(); } catch (error) {}
+    try { editor.updateInspector && editor.updateInspector(); } catch (error) {}
+    try { editor.scheduleSave && editor.scheduleSave(); } catch (error) {}
+  }
+
+  function ensureCodeCollapseInspectorButton(editor) {
+    if (!editor || !editor.codeInspector) return;
+    let button = editor.codeInspector.querySelector('[data-action="toggle-code-collapse"]');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'subtle';
+      button.dataset.action = 'toggle-code-collapse';
+      button.innerHTML = icon('<path d="M7 10h10"/><path d="M7 14h6"/>') + '<span>Fold / expand</span>';
+      const refresh = editor.codeInspector.querySelector('[data-action="refresh-code-highlight"]');
+      if (refresh && refresh.parentNode) refresh.parentNode.appendChild(button);
+      else editor.codeInspector.appendChild(button);
+    }
+    const figure = getCodeFigure(editor.selectedNode);
+    const collapsed = !!(figure && figure.dataset.collapsed === 'true');
+    button.setAttribute('aria-label', collapsed ? 'Expand code block' : 'Collapse code block');
+    button.setAttribute('title', collapsed ? 'Expand code block' : 'Collapse code block');
+    button.classList.toggle('is-active', collapsed);
+  }
+
+  function applyPatch(editor) {
+    if (!editor || editor.__statkissCompletionPatchApplied) return;
+    editor.__statkissCompletionPatchApplied = true;
+
+    if (!editor.scheduleSave && editor.markDirty) editor.scheduleSave = editor.markDirty.bind(editor);
+    if (!editor.updateStats && editor.updateStatus) editor.updateStats = editor.updateStatus.bind(editor);
+
+    ensureCodeCollapseInspectorButton(editor);
+
+    const originalHandleAction = typeof editor.handleAction === 'function' ? editor.handleAction.bind(editor) : null;
+    editor.toggleSelectedCodeCollapse = function statkissToggleSelectedCodeCollapse() {
+      const figure = getCodeFigure(this.selectedNode);
+      if (!figure) return;
+      const collapsed = figure.dataset.collapsed === 'true';
+      figure.dataset.collapsed = String(!collapsed);
+      if (typeof this.renderCodeNode === 'function') this.renderCodeNode(figure);
+      if (typeof this.selectNode === 'function') this.selectNode(figure);
+      ensureCodeCollapseInspectorButton(this);
+      markChanged(this);
+    };
+
+    editor.handleAction = function statkissCompletionHandleAction(action, button) {
+      if (action === 'toggle-code-collapse') {
+        this.toggleSelectedCodeCollapse();
+        return;
+      }
+      if (originalHandleAction) return originalHandleAction(action, button);
+    };
+
+    ['tableAddRow','tableAddCol','tableDeleteRow','tableDeleteCol','removeSelectedNode'].forEach(function(name){
+      const original = editor[name];
+      if (typeof original !== 'function' || original.__statkissWrapped) return;
+      const wrapped = function statkissWrappedTableAction() {
+        const result = original.apply(this, arguments);
+        const table = getTableNode(this.selectedNode) || getTableNode(this.__activeTableCell);
+        if (table && typeof this.selectNode === 'function') {
+          this.selectNode(table);
+          if (typeof this.showTableInspector === 'function') this.showTableInspector(table);
+        }
+        markChanged(this);
+        return result;
+      };
+      wrapped.__statkissWrapped = true;
+      editor[name] = wrapped;
+    });
+
+    const originalShowTableInspector = typeof editor.showTableInspector === 'function' ? editor.showTableInspector.bind(editor) : null;
+    editor.showTableInspector = function statkissCompletionShowTableInspector(table) {
+      if (originalShowTableInspector) originalShowTableInspector(table);
+      const panel = this.root.querySelector('#lreInspectorPanel, #inspectorPanel, .panel.right');
+      if (panel) panel.hidden = false;
+      if (this.inspectorPanel) this.inspectorPanel.hidden = false;
+      if (this.tableLocation && table && table.rows) {
+        const rows = table.rows.length;
+        const cols = rows && table.rows[0] ? table.rows[0].cells.length : 0;
+        this.tableLocation.textContent = rows + ' rows × ' + cols + ' columns';
+      }
+    };
+
+    const originalShowCodeInspector = typeof editor.showCodeInspector === 'function' ? editor.showCodeInspector.bind(editor) : null;
+    editor.showCodeInspector = function statkissCompletionShowCodeInspector(node) {
+      if (originalShowCodeInspector) originalShowCodeInspector(node);
+      const panel = this.root.querySelector('#lreInspectorPanel, #inspectorPanel, .panel.right');
+      if (panel) panel.hidden = false;
+      if (this.inspectorPanel) this.inspectorPanel.hidden = false;
+      ensureCodeCollapseInspectorButton(this);
+    };
+
+    const originalUpdateInspector = typeof editor.updateInspector === 'function' ? editor.updateInspector.bind(editor) : null;
+    editor.updateInspector = function statkissCompletionUpdateInspector() {
+      if (originalUpdateInspector) originalUpdateInspector();
+      ensureCodeCollapseInspectorButton(this);
+      const panel = this.root.querySelector('#lreInspectorPanel, #inspectorPanel, .panel.right');
+      const active = !!(
+        (typeof this.getSelectedImageNode === 'function' && this.getSelectedImageNode()) ||
+        (typeof this.getSelectedTable === 'function' && this.getSelectedTable()) ||
+        (typeof this.getSelectedMathNode === 'function' && this.getSelectedMathNode()) ||
+        (typeof this.getSelectedCodeNode === 'function' && this.getSelectedCodeNode())
+      );
+      if (panel) panel.hidden = !active;
+      if (this.inspectorPanel) this.inspectorPanel.hidden = !active;
+    };
+
+    const originalUpdateSelectedContext = typeof editor.updateSelectedContextFromSelection === 'function' ? editor.updateSelectedContextFromSelection.bind(editor) : null;
+    editor.updateSelectedContextFromSelection = function statkissCompletionUpdateSelectedContextFromSelection() {
+      if (originalUpdateSelectedContext) originalUpdateSelectedContext();
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      if (!this.editor || !this.editor.contains(range.commonAncestorContainer)) return;
+      let node = range.startContainer;
+      if (node && node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+      const special = getCodeFigure(node) || getTableNode(node) || (node && node.closest ? node.closest('.lre-math-node, .latex-node, .lre-image-node, figure.image-figure') : null);
+      if (!special && typeof this.clearNodeSelection === 'function') this.clearNodeSelection();
+    };
+
+    const originalUpdateSourceView = typeof editor.updateSourceView === 'function' ? editor.updateSourceView.bind(editor) : null;
+    editor.updateSourceView = function statkissCompletionUpdateSourceView() {
+      if (originalUpdateSourceView) originalUpdateSourceView();
+      try { this.renderAllMath && this.renderAllMath(); } catch (error) {}
+      try {
+        const root = this.root || this.editor;
+        if (root) root.querySelectorAll('.lre-code-node').forEach((figure) => { this.renderCodeNode && this.renderCodeNode(figure); });
+      } catch (error) {}
+    };
+
+    ensureCodeCollapseInspectorButton(editor);
+    try { editor.updateInspector && editor.updateInspector(); } catch (error) {}
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function(){ waitForEditor(applyPatch); }, { once: true });
+  } else {
+    waitForEditor(applyPatch);
+  }
 })();
