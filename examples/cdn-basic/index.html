@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SolidEdit CDN Example</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page-bg: #f5f7fb;
+      --surface: #ffffff;
+      --border: #d9e1ef;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+      --radius: 20px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font: 16px/1.6 Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--page-bg);
+      color: var(--text);
+    }
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 18px 48px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.2;
+    }
+    p.lead {
+      margin: 0 0 24px;
+      color: var(--muted);
+    }
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+    label {
+      display: grid;
+      gap: 8px;
+      font-weight: 600;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font: inherit;
+      background: #fff;
+      color: var(--text);
+    }
+    textarea {
+      min-height: 360px;
+      resize: vertical;
+    }
+    .note {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    code {
+      background: rgba(148, 163, 184, 0.16);
+      padding: 0.1em 0.4em;
+      border-radius: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+  </style>
+
+  <script>
+    window.CONTENT_EDITOR_AUTOSTART = false;
+    window.CONTENT_EDITOR_AUTOINIT = false;
+    window.CONTENT_EDITOR_ENABLE_CODEBLOCK = true;
+    window.CONTENT_EDITOR_CONFIG = Object.assign({
+      placeholder: "Write your content here."
+    }, window.CONTENT_EDITOR_CONFIG || {});
+    window.CONTENT_EDITOR_MATHJAX_CDN_URL =
+      window.CONTENT_EDITOR_MATHJAX_CDN_URL ||
+      "https://cdn.jsdelivr.net/gh/mathjax/MathJax@3.2.2/es5/tex-svg.js";
+    window.CONTENT_EDITOR_HLJS_SCRIPT_SRC =
+      window.CONTENT_EDITOR_HLJS_SCRIPT_SRC ||
+      "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js";
+    window.CONTENT_EDITOR_HLJS_STYLE_HREF =
+      window.CONTENT_EDITOR_HLJS_STYLE_HREF ||
+      "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css";
+  </script>
+
+  <!-- Fixed 0.0.2 release -->
+  <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.2/versions/0.0.2/editor.js"></script>
+
+  <!-- Alternative moving latest channel -->
+  <!-- <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/latest/editor.js"></script> -->
+
+  <!-- Pre-tag fallback for the same fixed folder -->
+  <!-- <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/versions/0.0.2/editor.js"></script> -->
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <h1>SolidEdit CDN Example</h1>
+      <p class="lead">
+        This is a generic host-page example. It does not use any StatKISS-specific markup or globals.
+      </p>
+
+      <div class="stack">
+        <label for="postTitle">
+          Title
+          <input id="postTitle" type="text" placeholder="Enter a title" />
+        </label>
+
+        <label for="postBody">
+          Content
+          <textarea id="postBody" name="content" rows="18" placeholder="Write your content here."></textarea>
+        </label>
+      </div>
+
+      <p class="note">
+        The editor is mounted explicitly with <code>mountContentEditor("#postBody", ...)</code>.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    window.addEventListener("DOMContentLoaded", function () {
+      if (typeof window.mountContentEditor !== "function") {
+        console.error("SolidEdit failed to load.");
+        return;
+      }
+
+      const editor = window.mountContentEditor("#postBody", {
+        placeholder: "Write your content here.",
+        titleField: "#postTitle",
+        storageKey: "solid-edit-cdn-example-0.0.2"
+      });
+
+      if (!editor) {
+        console.error("SolidEdit failed to mount on #postBody.");
+      }
+    });
+  </script>
+</body>
+</html>
