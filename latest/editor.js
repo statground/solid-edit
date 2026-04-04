@@ -14234,3 +14234,513 @@ if (typeof window !== 'undefined') {
     waitForEditor(patchEditor);
   }
 })();
+
+/* StatKISS embedded editor dark-mode palette patch 20260403 */
+(function(){
+  'use strict';
+
+  const PATCH_FLAG = '__statkissEmbeddedDarkPalettePatch20260403';
+  const STYLE_ID = 'statkiss-embedded-dark-palette-style-20260403';
+  const WATCH_ATTRS = ['class', 'data-theme', 'theme', 'data-bs-theme', 'data-color-mode', 'style'];
+
+  const STYLE = `
+    .lre-root.lre-embedded-content {
+      --sk-embed-surface: #ffffff;
+      --sk-embed-surface-soft: #f8fafc;
+      --sk-embed-toolbar: rgba(255,255,255,.96);
+      --sk-embed-border: #d7dde7;
+      --sk-embed-border-strong: #cbd5e1;
+      --sk-embed-text: #111827;
+      --sk-embed-text-soft: #475569;
+      --sk-embed-muted: #6b7280;
+      --sk-embed-accent: #2563eb;
+      --sk-embed-accent-soft: rgba(37,99,235,.12);
+      --sk-embed-hover: rgba(15,23,42,.05);
+      --sk-embed-overlay: rgba(15,23,42,.18);
+      --sk-embed-shadow: 0 18px 42px rgba(15,23,42,.12);
+    }
+
+    html.dark .lre-root.lre-embedded-content,
+    body.dark .lre-root.lre-embedded-content,
+    html.theme-dark .lre-root.lre-embedded-content,
+    body.theme-dark .lre-root.lre-embedded-content,
+    html[data-theme="dark"] .lre-root.lre-embedded-content,
+    body[data-theme="dark"] .lre-root.lre-embedded-content,
+    html[data-bs-theme="dark"] .lre-root.lre-embedded-content,
+    body[data-bs-theme="dark"] .lre-root.lre-embedded-content,
+    html[data-color-mode="dark"] .lre-root.lre-embedded-content,
+    body[data-color-mode="dark"] .lre-root.lre-embedded-content,
+    body.lre-dark .lre-root.lre-embedded-content,
+    .lre-root.lre-embedded-content.statkiss-host-dark {
+      --sk-embed-surface: #081120;
+      --sk-embed-surface-soft: #0d1728;
+      --sk-embed-toolbar: rgba(7,16,31,.94);
+      --sk-embed-border: rgba(71,85,105,.54);
+      --sk-embed-border-strong: rgba(96,165,250,.26);
+      --sk-embed-text: #e5eefc;
+      --sk-embed-text-soft: #cbd5e1;
+      --sk-embed-muted: #94a3b8;
+      --sk-embed-accent: #60a5fa;
+      --sk-embed-accent-soft: rgba(96,165,250,.18);
+      --sk-embed-hover: rgba(148,163,184,.08);
+      --sk-embed-overlay: rgba(2,6,23,.42);
+      --sk-embed-shadow: 0 24px 56px rgba(2,6,23,.34);
+      color: var(--sk-embed-text) !important;
+    }
+
+    .lre-root.lre-embedded-content,
+    .lre-root.lre-embedded-content .lre-app,
+    .lre-root.lre-embedded-content .lre-surface {
+      color: var(--sk-embed-text) !important;
+    }
+
+    .lre-root.lre-embedded-content #lreEmbedToolbarHost,
+    .lre-root.lre-embedded-content .lre-editor-page,
+    .lre-root.lre-embedded-content .lre-statusbar,
+    .lre-root.lre-embedded-content .lre-source-card,
+    .lre-root.lre-embedded-content .lre-panel,
+    .lre-root.lre-embedded-content .lre-searchbar {
+      background: var(--sk-embed-toolbar) !important;
+      border-color: var(--sk-embed-border) !important;
+      color: var(--sk-embed-text) !important;
+      box-shadow: none !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-editor-page {
+      background: var(--sk-embed-surface) !important;
+      border: 1px solid var(--sk-embed-border) !important;
+      color: var(--sk-embed-text) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-editor-page:empty::before,
+    .lre-root.lre-embedded-content .lre-note,
+    .lre-root.lre-embedded-content .lre-status-items,
+    .lre-root.lre-embedded-content .lre-search-count,
+    .lre-root.lre-embedded-content .lre-image-node figcaption,
+    .lre-root.lre-embedded-content .lre-field > span,
+    .lre-root.lre-embedded-content .lre-field label,
+    .lre-root.lre-embedded-content .statkiss-inline-fields label {
+      color: var(--sk-embed-muted) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-group {
+      background: var(--sk-embed-surface-soft) !important;
+      border-color: var(--sk-embed-border) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-btn,
+    .lre-root.lre-embedded-content .statkiss-mode-switcher button,
+    .lre-root.lre-embedded-content .statkiss-code-toggle,
+    .lre-root.lre-embedded-content .table-picker-actions button,
+    .lre-root.lre-embedded-content .statkiss-inline-actions button {
+      color: var(--sk-embed-text) !important;
+      border-color: var(--sk-embed-border) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-btn:hover,
+    .lre-root.lre-embedded-content .statkiss-code-toggle:hover,
+    .lre-root.lre-embedded-content .table-picker-actions button:hover,
+    .lre-root.lre-embedded-content .statkiss-inline-actions button:hover {
+      background: var(--sk-embed-hover) !important;
+      border-color: var(--sk-embed-accent) !important;
+      color: var(--sk-embed-accent) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-btn.is-active,
+    .lre-root.lre-embedded-content .statkiss-mode-switcher button.is-active {
+      background: var(--sk-embed-accent-soft) !important;
+      border-color: var(--sk-embed-accent) !important;
+      color: var(--sk-embed-accent) !important;
+      box-shadow: none !important;
+    }
+
+    .lre-root.lre-embedded-content .statkiss-mode-switcher {
+      background: var(--sk-embed-toolbar) !important;
+      border-color: var(--sk-embed-border) !important;
+      box-shadow: none !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-source-card header,
+    .lre-root.lre-embedded-content .lre-source-card textarea,
+    .lre-root.lre-embedded-content .lre-source-preview,
+    .lre-root.lre-embedded-content .lre-searchbar input,
+    .lre-root.lre-embedded-content .lre-field input,
+    .lre-root.lre-embedded-content .lre-field select,
+    .lre-root.lre-embedded-content .lre-field textarea,
+    .lre-root.lre-embedded-content .lre-dialog textarea,
+    .lre-root.lre-embedded-content .lre-color-popover input,
+    .lre-root.lre-embedded-content .table-picker-manual input,
+    .lre-root.lre-embedded-content .statkiss-inline-fields input {
+      background: var(--sk-embed-surface-soft) !important;
+      border-color: var(--sk-embed-border) !important;
+      color: var(--sk-embed-text) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-searchbar input::placeholder,
+    .lre-root.lre-embedded-content .lre-field input::placeholder,
+    .lre-root.lre-embedded-content .lre-field textarea::placeholder,
+    .lre-root.lre-embedded-content .lre-dialog textarea::placeholder,
+    .lre-root.lre-embedded-content .table-picker-manual input::placeholder,
+    .lre-root.lre-embedded-content .statkiss-inline-fields input::placeholder {
+      color: var(--sk-embed-muted) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-editor-page blockquote {
+      background: var(--sk-embed-surface-soft) !important;
+      border-left-color: var(--sk-embed-accent) !important;
+      color: var(--sk-embed-text-soft) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-inline-code {
+      background: var(--sk-embed-surface-soft) !important;
+      color: var(--sk-embed-text) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-editor-page hr {
+      border-top-color: var(--sk-embed-border) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-editor-page a,
+    .lre-root.lre-embedded-content .lre-source-preview a {
+      color: var(--sk-embed-accent) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-editor-page table,
+    .lre-root.lre-embedded-content .lre-editor-page th,
+    .lre-root.lre-embedded-content .lre-editor-page td {
+      border-color: var(--sk-embed-border) !important;
+      color: var(--sk-embed-text) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-editor-page th {
+      background: var(--sk-embed-surface-soft) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-dialog-card,
+    .lre-root.lre-embedded-content .lre-color-popover.is-open,
+    .lre-root.lre-embedded-content .table-picker-pop,
+    .lre-root.lre-embedded-content .statkiss-inline-card {
+      background: var(--sk-embed-toolbar) !important;
+      border-color: var(--sk-embed-border) !important;
+      color: var(--sk-embed-text) !important;
+      box-shadow: var(--sk-embed-shadow) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-color-popover::before,
+    .lre-root.lre-embedded-content dialog.lre-dialog::backdrop {
+      background: var(--sk-embed-overlay) !important;
+    }
+
+    .lre-root.lre-embedded-content .table-picker-cell,
+    .lre-root.lre-embedded-content .statkiss-inline-grid button {
+      background: var(--sk-embed-surface) !important;
+      border-color: var(--sk-embed-border) !important;
+    }
+
+    .lre-root.lre-embedded-content .table-picker-cell.is-hot,
+    .lre-root.lre-embedded-content .statkiss-inline-grid button.is-active {
+      background: var(--sk-embed-accent-soft) !important;
+      border-color: var(--sk-embed-accent) !important;
+    }
+
+    .lre-root.lre-embedded-content .table-picker-grid,
+    .lre-root.lre-embedded-content .statkiss-inline-grid {
+      background: var(--sk-embed-surface-soft) !important;
+      border-color: var(--sk-embed-border) !important;
+    }
+
+    .lre-root.lre-embedded-content .table-picker-meta,
+    .lre-root.lre-embedded-content .statkiss-inline-card h3,
+    .lre-root.lre-embedded-content .lre-panel h2,
+    .lre-root.lre-embedded-content .lre-panel h3 {
+      color: var(--sk-embed-text) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-code-node,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node {
+      background: var(--sk-embed-surface-soft) !important;
+      border-color: var(--sk-embed-border) !important;
+      color: var(--sk-embed-text) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-code-head,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-head,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-head {
+      background: rgba(255,255,255,.88) !important;
+      border-color: var(--sk-embed-border) !important;
+    }
+
+    html.dark .lre-root.lre-embedded-content .lre-code-head,
+    body.dark .lre-root.lre-embedded-content .lre-code-head,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-head,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-head,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-head,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-head {
+      background: rgba(15,23,42,.9) !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-code-head .lre-chip,
+    .lre-root.lre-embedded-content .statkiss-code-toggle {
+      background: rgba(37,99,235,.08) !important;
+      border-color: rgba(37,99,235,.18) !important;
+      color: var(--sk-embed-accent) !important;
+    }
+
+    html.dark .lre-root.lre-embedded-content .lre-code-head .lre-chip,
+    body.dark .lre-root.lre-embedded-content .lre-code-head .lre-chip,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-head .lre-chip,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-head .lre-chip,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-head .lre-chip,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-head .lre-chip,
+    html.dark .lre-root.lre-embedded-content .statkiss-code-toggle,
+    body.dark .lre-root.lre-embedded-content .statkiss-code-toggle,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .statkiss-code-toggle,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .statkiss-code-toggle,
+    body.lre-dark .lre-root.lre-embedded-content .statkiss-code-toggle,
+    .lre-root.lre-embedded-content.statkiss-host-dark .statkiss-code-toggle {
+      background: rgba(15,23,42,.8) !important;
+      border-color: rgba(96,165,250,.22) !important;
+      color: #bfdbfe !important;
+    }
+
+    .lre-root.lre-embedded-content .lre-code-node .tok-comment { color: #64748b !important; }
+    .lre-root.lre-embedded-content .lre-code-node .tok-key,
+    .lre-root.lre-embedded-content .lre-code-node .tok-tag { color: #0f766e !important; }
+    .lre-root.lre-embedded-content .lre-code-node .tok-string,
+    .lre-root.lre-embedded-content .lre-code-node .tok-link { color: #b45309 !important; }
+    .lre-root.lre-embedded-content .lre-code-node .tok-number { color: #7c3aed !important; }
+    .lre-root.lre-embedded-content .lre-code-node .tok-attr { color: #1d4ed8 !important; }
+    .lre-root.lre-embedded-content .lre-code-node .tok-fn,
+    .lre-root.lre-embedded-content .lre-code-node .tok-title { color: #be123c !important; }
+    .lre-root.lre-embedded-content .lre-code-node .tok-type,
+    .lre-root.lre-embedded-content .lre-code-node .tok-bullet { color: #4f46e5 !important; }
+
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-comment,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-comment,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-comment,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-comment,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-comment,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-comment { color: #94a3b8 !important; }
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-key,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-key,
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-tag,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-tag,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-key,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-key,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-tag,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-tag,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-key,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-tag,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-key,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-tag { color: #5eead4 !important; }
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-string,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-string,
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-link,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-link,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-string,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-string,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-link,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-link,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-string,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-link,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-string,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-link { color: #fbbf24 !important; }
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-number,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-number,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-number,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-number,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-number,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-number { color: #c4b5fd !important; }
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-attr,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-attr,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-attr,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-attr,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-attr,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-attr { color: #93c5fd !important; }
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-fn,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-fn,
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-title,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-title,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-fn,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-fn,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-title,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-title,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-fn,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-title,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-fn,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-title { color: #fda4af !important; }
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-type,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-type,
+    html.dark .lre-root.lre-embedded-content .lre-code-node .tok-bullet,
+    body.dark .lre-root.lre-embedded-content .lre-code-node .tok-bullet,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-type,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-type,
+    html[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-bullet,
+    body[data-theme="dark"] .lre-root.lre-embedded-content .lre-code-node .tok-bullet,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-type,
+    body.lre-dark .lre-root.lre-embedded-content .lre-code-node .tok-bullet,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-type,
+    .lre-root.lre-embedded-content.statkiss-host-dark .lre-code-node .tok-bullet { color: #a5b4fc !important; }
+    `;
+
+  function ensureStyle() {
+    let style = document.getElementById(STYLE_ID);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = STYLE_ID;
+      document.head.appendChild(style);
+    }
+    style.textContent = STYLE;
+    return style;
+  }
+
+  function normalizeThemeValue(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return null;
+    if (raw === 'dark') return 'dark';
+    if (raw === 'light') return 'light';
+    if (raw === 'night') return 'dark';
+    if (raw === 'day') return 'light';
+    return null;
+  }
+
+  function getThemeFromClassList(el) {
+    if (!el || !el.classList) return null;
+    if (el.classList.contains('dark') || el.classList.contains('theme-dark')) return 'dark';
+    if (el.classList.contains('light') || el.classList.contains('theme-light')) return 'light';
+    return null;
+  }
+
+  function getThemeFromAttributes(el) {
+    if (!el || !el.getAttribute) return null;
+    const keys = ['data-theme', 'theme', 'data-bs-theme', 'data-color-mode'];
+    for (let i = 0; i < keys.length; i += 1) {
+      const next = normalizeThemeValue(el.getAttribute(keys[i]));
+      if (next) return next;
+    }
+    return null;
+  }
+
+  function getThemeFromStorage() {
+    const keys = ['statkiss_theme', 'statkiss_appearance', 'appearance', 'theme', 'color-theme', 'mode'];
+    for (let i = 0; i < keys.length; i += 1) {
+      try {
+        const next = normalizeThemeValue(localStorage.getItem(keys[i]));
+        if (next) return next;
+      } catch (error) {}
+    }
+    return null;
+  }
+
+  function detectHostTheme() {
+    if (document.body && document.body.classList && document.body.classList.contains('lre-dark')) return 'dark';
+    const targets = [document.documentElement, document.body];
+    for (let i = 0; i < targets.length; i += 1) {
+      const themeByClass = getThemeFromClassList(targets[i]);
+      if (themeByClass) return themeByClass;
+      const themeByAttr = getThemeFromAttributes(targets[i]);
+      if (themeByAttr) return themeByAttr;
+    }
+    const fromStorage = getThemeFromStorage();
+    if (fromStorage) return fromStorage;
+    return null;
+  }
+
+  function syncHostTheme(editor) {
+    if (!editor || !editor.root) return;
+    const nextTheme = detectHostTheme();
+    const dark = nextTheme === 'dark';
+    editor.root.classList.toggle('statkiss-host-dark', dark);
+    editor.root.setAttribute('data-statkiss-host-theme', dark ? 'dark' : 'light');
+  }
+
+  function bindHostThemeSync(editor) {
+    if (!editor || !editor.root) return;
+    syncHostTheme(editor);
+    if (editor.__statkissHostThemeSyncBound) return;
+    editor.__statkissHostThemeSyncBound = true;
+
+    const schedule = function(){ syncHostTheme(editor); };
+
+    if (document.documentElement) {
+      const observer = new MutationObserver(schedule);
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: WATCH_ATTRS });
+      if (document.body) observer.observe(document.body, { attributes: true, attributeFilter: WATCH_ATTRS });
+      editor.__statkissHostThemeObserver = observer;
+    }
+
+    window.addEventListener('statkiss:theme', schedule);
+    window.addEventListener('storage', schedule);
+    if (window.matchMedia) {
+      try {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        if (mq && typeof mq.addEventListener === 'function') mq.addEventListener('change', schedule);
+        else if (mq && typeof mq.addListener === 'function') mq.addListener(schedule);
+        editor.__statkissHostThemeMedia = mq;
+      } catch (error) {}
+    }
+  }
+
+  function patchEditor(editor) {
+    if (!editor || !editor.root || editor[PATCH_FLAG]) return editor;
+    editor[PATCH_FLAG] = true;
+    ensureStyle();
+    bindHostThemeSync(editor);
+    syncHostTheme(editor);
+    try { console.info('[LocalRichEditor]', '20260403-dark-palette-patch applied'); } catch (error) {}
+    return editor;
+  }
+
+  function waitForEditor(callback) {
+    const run = function() {
+      const editor = window.__localRichEditor || window.localRichEditor || window.__solidAutoMountedContentEditor || null;
+      if (!editor) return false;
+      callback(editor);
+      return true;
+    };
+    if (run()) return;
+    let tries = 0;
+    const timer = setInterval(function(){
+      tries += 1;
+      if (run() || tries > 320) clearInterval(timer);
+    }, 50);
+    window.addEventListener('local-rich-editor:ready', function(){
+      if (run()) clearInterval(timer);
+    }, { once: true });
+  }
+
+  function wrapMount(name) {
+    const original = window[name];
+    if (typeof original !== 'function' || original.__statkissDarkPaletteWrapped) return;
+    const wrapped = function() {
+      const result = original.apply(this, arguments);
+      if (result && typeof result.then === 'function') {
+        return result.then(function(editor){ return patchEditor(editor); });
+      }
+      return patchEditor(result);
+    };
+    wrapped.__statkissDarkPaletteWrapped = true;
+    wrapped.__statkissDarkPaletteOriginal = original;
+    window[name] = wrapped;
+  }
+
+  [
+    'mountStatkissContentEditor',
+    'mountEmbeddedContentEditor',
+    'initStatkissContentEditor',
+    'initEmbeddedContentEditor',
+    'autoMountStatkissContentEditor',
+    'mountContentEditor',
+    'initContentEditor',
+    'autoMountContentEditor',
+    'mountLocalRichEditor',
+    'createLocalRichEditor'
+  ].forEach(wrapMount);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ waitForEditor(patchEditor); }, { once: true });
+  } else {
+    waitForEditor(patchEditor);
+  }
+})();
