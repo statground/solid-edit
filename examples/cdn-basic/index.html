@@ -98,14 +98,12 @@
       "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css";
   </script>
 
-  <!-- Fixed 0.0.2 release -->
-  <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.2/versions/0.0.2/editor.js"></script>
+  <!-- Immutable 0.0.3 release tag. Production consumers should prefer the verified 40-character commit SHA. -->
+  <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.3/versions/0.0.3/editor.js"></script>
 
   <!-- Alternative moving latest channel -->
   <!-- <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/latest/editor.js"></script> -->
 
-  <!-- Pre-tag fallback for the same fixed folder -->
-  <!-- <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/versions/0.0.2/editor.js"></script> -->
 </head>
 <body>
   <main class="page">
@@ -143,7 +141,7 @@
       const editor = window.mountContentEditor("#postBody", {
         placeholder: "Write your content here.",
         titleField: "#postTitle",
-        storageKey: "solid-edit-cdn-example-0.0.2"
+        storageKey: "solid-edit-cdn-example-0.0.3"
       });
 
       if (!editor) {

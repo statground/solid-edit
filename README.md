@@ -13,16 +13,29 @@
 
 ## Overview
 
-**SolidEdit 0.0.2** is the stabilized reusable release of the editor that was previously documented as a simple local `index.html + editor.js` editor.
+**SolidEdit 0.0.3** adds explicit full and mini interface modes to the stabilized reusable editor.
 
 This release keeps the same product direction — local-first editing, predictable behavior, minimal host-page friction — but formalizes the project as a **generic embeddable editor** rather than a StatKISS-specific page script.
 
 The current public documentation assumes:
 
-- a moving **latest** channel
-- a fixed **versions/0.0.2** release channel
+- `versions/0.0.3/editor.js` as the current fixed release path
+- exact commit SHA pinning in production
+- `latest/` as a moving development/evaluation channel only
 - a generic host-page API based on `mountContentEditor`, `initContentEditor`, and `CONTENT_EDITOR_*` globals
 - backward compatibility for older `STATKISS_*` host globals, without using that naming in public examples
+
+---
+
+## 0.0.3 Release Highlights
+
+- Full mode is the default and shows every content tool immediately.
+- The ribbon expand/collapse control has been removed.
+- `toolbarSize: "mini"` keeps the same tools and saved HTML while using 32px buttons, 16px icons, and tighter toolbar spacing.
+- Mini mode fixes the toolbar at its compact size and hides the toolbar-size control.
+- Existing `mountContentEditor(...)` and `initContentEditor(...)` integrations remain compatible.
+
+See [CHANGELOG_0.0.3_vs_0.0.2.md](./CHANGELOG_0.0.3_vs_0.0.2.md) for the focused release comparison.
 
 ---
 
@@ -163,12 +176,13 @@ For a condensed comparison list, see [CHANGELOG_0.0.2_vs_0.0.1.md](./CHANGELOG_0
 
 ## Repository Layout
 
-A practical 0.0.2 repository layout can look like this:
+A practical 0.0.3 repository layout can look like this:
 
 ```text
 solid-edit/
 ├── README.md
 ├── README.ko.md
+├── CHANGELOG_0.0.3_vs_0.0.2.md
 ├── CHANGELOG_0.0.2_vs_0.0.1.md
 ├── CHATGPT_PROJECT_INSTRUCTIONS.ko.md
 ├── docs/
@@ -183,7 +197,9 @@ solid-edit/
 ├── latest/
 │   └── editor.js
 └── versions/
-    └── 0.0.2/
+    ├── 0.0.2/
+    │   └── editor.js
+    └── 0.0.3/
         └── editor.js
 ```
 
@@ -191,19 +207,26 @@ solid-edit/
 
 ## CDN Paths
 
-### Latest channel
+### Production pin
+
+Replace the placeholder with the verified 40-character release commit SHA:
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@<40-character-commit-sha>/versions/0.0.3/editor.js"></script>
+```
+
+### Immutable 0.0.3 release tag
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.3/versions/0.0.3/editor.js"></script>
+```
+
+### Moving development channel
+
+Do not use this URL in production:
+
 ```html
 <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/latest/editor.js"></script>
-```
-
-### Fixed 0.0.2 release
-```html
-<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.2/versions/0.0.2/editor.js"></script>
-```
-
-### Pre-tag fallback for the same 0.0.2 folder
-```html
-<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/versions/0.0.2/editor.js"></script>
 ```
 
 ---
@@ -221,9 +244,24 @@ Typical usage:
 window.mountContentEditor("#postBody", {
   placeholder: "Write your content here.",
   titleField: "#postTitle",
-  storageKey: "solid-edit-demo-0.0.2"
+  storageKey: "solid-edit-demo-0.0.3"
 });
 ```
+
+`full` is the default. It always shows every available content tool and has no expand/collapse control.
+
+### Mini toolbar
+
+Use mini mode for compact surfaces such as comments and replies:
+
+```javascript
+window.mountContentEditor("#commentBody", {
+  toolbarSize: "mini",
+  placeholder: "Write a comment."
+});
+```
+
+Mini mode changes toolbar density only. It preserves the same tool set, public API, and saved HTML contract as full mode.
 
 ### Auto-init / observer-based mount
 ```javascript
@@ -268,7 +306,7 @@ It demonstrates:
 - a textarea target
 - explicit `mountContentEditor(...)`
 - generic `CONTENT_EDITOR_*` configuration
-- a fixed 0.0.2 CDN path, plus commented alternatives
+- the immutable 0.0.3 release tag and default full-mode mount
 
 ---
 

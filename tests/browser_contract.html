@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SolidEdit browser contract: pending</title>
+  <style>body > .lre-root { display: none !important; }</style>
+</head>
+<body>
+  <textarea id="editorTarget" rows="8"></textarea>
+  <pre id="result">pending</pre>
+  <script src="../latest/editor.js"></script>
+  <script>
+    (function () {
+      const mode = new URLSearchParams(window.location.search).get("mode") === "mini" ? "mini" : "full";
+      const editor = window.mountContentEditor("#editorTarget", mode === "mini" ? { toolbarSize: "mini" } : {});
+      const root = editor && editor.root;
+      window.setTimeout(() => {
+        const firstButton = root && Array.from(root.querySelectorAll(".lre-btn")).find((button) => {
+          const group = button.closest(".lre-group");
+          return getComputedStyle(button).display !== "none" && (!group || getComputedStyle(group).display !== "none");
+        });
+        const firstIcon = firstButton && firstButton.querySelector("svg");
+        const result = {
+          mode: root && root.getAttribute("data-solid-edit-mode"),
+          ribbonToggleCount: root ? root.querySelectorAll("[data-ribbon-toggle], .lre-ribbon-toggle-group").length : -1,
+          hiddenAdvancedGroupCount: root ? Array.from(root.querySelectorAll('.lre-group[data-ribbon-group="advanced"]')).filter((group) => getComputedStyle(group).display === "none" && group.getAttribute("data-embed-empty") !== "true").length : -1,
+          buttonWidth: firstButton ? getComputedStyle(firstButton).width : "",
+          iconWidth: firstIcon ? getComputedStyle(firstIcon).width : "",
+          toolbarSizeControlDisplay: root && root.querySelector(".statkiss-toolbar-size-group") ? getComputedStyle(root.querySelector(".statkiss-toolbar-size-group")).display : "missing"
+        };
+        document.getElementById("result").textContent = JSON.stringify(result);
+        document.title = "SolidEdit browser contract: ready";
+      }, 500);
+    })();
+  </script>
+</body>
+</html>

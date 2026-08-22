@@ -13,8 +13,7 @@
 
 ## 개요
 
-**SolidEdit 0.0.2**는 기존의 “로컬에서 바로 열어 쓰는 에디터”라는 방향을 유지하면서,
-이를 **재사용 가능한 범용 임베디드 에디터 릴리스**로 정리한 버전입니다.
+**SolidEdit 0.0.3**은 안정화된 범용 임베디드 에디터에 명시적인 full/mini 화면 모드를 추가한 버전입니다.
 
 핵심 방향은 그대로입니다.
 
@@ -23,12 +22,25 @@
 - 호스트 페이지에 과한 부담을 주지 않는 구조
 - 데모용 과장보다 실제 편집 안정성 우선
 
-다만 0.0.2에서는 문서화와 공개 사용법이 더 명확해졌습니다.
+현재 공개 사용법은 다음을 기준으로 합니다.
 
-- 움직이는 최신 채널 `latest/`
-- 고정 릴리스 채널 `versions/0.0.2/`
+- 현재 고정 릴리스 경로 `versions/0.0.3/editor.js`
+- 운영 환경의 40자 commit SHA 고정
+- 개발·평가 용도로만 사용하는 움직이는 `latest/` 채널
 - `mountContentEditor`, `initContentEditor`, `CONTENT_EDITOR_*` 기반의 범용 호스트 API
 - 기존 `STATKISS_*` 전역값은 호환성만 유지하고, 공개 문서에서는 쓰지 않음
+
+---
+
+## 0.0.3 핵심 정리
+
+- 기본 full 모드는 콘텐츠 도구를 처음부터 모두 표시합니다.
+- 도구 펼치기/접기 제어를 제거했습니다.
+- `toolbarSize: "mini"`는 같은 도구와 저장 HTML을 유지하면서 버튼 32px, 아이콘 16px, 더 좁은 toolbar 간격을 사용합니다.
+- mini 모드는 크기를 고정하고 toolbar 크기 변경 버튼을 숨깁니다.
+- 기존 `mountContentEditor(...)`, `initContentEditor(...)` 연동은 계속 호환됩니다.
+
+집중 비교 내용은 [CHANGELOG_0.0.3_vs_0.0.2.md](./CHANGELOG_0.0.3_vs_0.0.2.md)에서 확인할 수 있습니다.
 
 ---
 
@@ -171,12 +183,13 @@ SolidEdit 공개 문서와 예시에서는 쓰지 않는 것이 맞습니다.
 
 ## Repository 구조
 
-0.0.2 기준으로 문서까지 포함한 실무형 구조 예시는 아래처럼 잡을 수 있습니다.
+0.0.3 기준으로 문서까지 포함한 실무형 구조 예시는 아래처럼 잡을 수 있습니다.
 
 ```text
 solid-edit/
 ├── README.md
 ├── README.ko.md
+├── CHANGELOG_0.0.3_vs_0.0.2.md
 ├── CHANGELOG_0.0.2_vs_0.0.1.md
 ├── CHATGPT_PROJECT_INSTRUCTIONS.ko.md
 ├── docs/
@@ -191,7 +204,9 @@ solid-edit/
 ├── latest/
 │   └── editor.js
 └── versions/
-    └── 0.0.2/
+    ├── 0.0.2/
+    │   └── editor.js
+    └── 0.0.3/
         └── editor.js
 ```
 
@@ -199,19 +214,26 @@ solid-edit/
 
 ## CDN 경로
 
-### latest 채널
+### 운영 고정 경로
+
+placeholder를 검증된 40자 release commit SHA로 바꿔 사용합니다.
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@<40-character-commit-sha>/versions/0.0.3/editor.js"></script>
+```
+
+### 변경되지 않는 0.0.3 release tag
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.3/versions/0.0.3/editor.js"></script>
+```
+
+### 움직이는 개발 채널
+
+다음 URL은 운영 코드에 사용하지 않습니다.
+
 ```html
 <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/latest/editor.js"></script>
-```
-
-### 고정 0.0.2 릴리스
-```html
-<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.2/versions/0.0.2/editor.js"></script>
-```
-
-### 아직 tag를 만들기 전 사용할 수 있는 main fallback
-```html
-<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/versions/0.0.2/editor.js"></script>
 ```
 
 ---
@@ -229,9 +251,24 @@ window.mountContentEditor(target, options);
 window.mountContentEditor("#postBody", {
   placeholder: "Write your content here.",
   titleField: "#postTitle",
-  storageKey: "solid-edit-demo-0.0.2"
+  storageKey: "solid-edit-demo-0.0.3"
 });
 ```
+
+`full`은 기본값입니다. 사용할 수 있는 콘텐츠 도구를 모두 표시하고 펼치기/접기 제어를 두지 않습니다.
+
+### mini toolbar
+
+댓글·대댓글처럼 작은 작성 영역에는 mini 모드를 사용합니다.
+
+```javascript
+window.mountContentEditor("#commentBody", {
+  toolbarSize: "mini",
+  placeholder: "댓글을 입력해주세요."
+});
+```
+
+mini 모드는 toolbar 밀도만 바꿉니다. 도구 집합, 공개 API, 저장 HTML 계약은 full 모드와 같습니다.
 
 ### observer 기반 auto-init
 ```javascript
@@ -276,7 +313,7 @@ examples/cdn-basic/index.html
 - title input + textarea 구조
 - 명시적 `mountContentEditor(...)`
 - `CONTENT_EDITOR_*` 기준 설정
-- 고정 0.0.2 CDN 경로와 대체 경로 주석
+- 변경되지 않는 0.0.3 release tag와 기본 full 모드 mount
 
 ---
 
