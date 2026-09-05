@@ -21,7 +21,7 @@ Switching density does not change the document format. Narrow screens wrap the t
 
 ## Start editing
 
-Copy this into an HTML page. Replace `RELEASE_COMMIT_SHA` with the 40-character commit containing the `versions/0.0.4/editor.js` bundle.
+Copy this complete example into an HTML page. Its CDN address points to the verified 0.0.4 release commit.
 
 ```html
 <textarea id="content"><h2>My first document</h2><p>Start here.</p></textarea>
@@ -29,7 +29,7 @@ Copy this into an HTML page. Replace `RELEASE_COMMIT_SHA` with the 40-character 
   window.CONTENT_EDITOR_AUTOSTART = false;
   window.CONTENT_EDITOR_AUTOINIT = false;
 </script>
-<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@RELEASE_COMMIT_SHA/versions/0.0.4/editor.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@ba2b1a6097fa2c677d9a51499a9a5e332afe4fb5/versions/0.0.4/editor.js"></script>
 <script>
   const editor = window.mountContentEditor("#content", {
     lang: "en",

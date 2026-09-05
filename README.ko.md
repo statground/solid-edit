@@ -21,7 +21,7 @@
 
 ## 편집기 붙이기
 
-아래 코드를 HTML 페이지에 넣으세요. `RELEASE_COMMIT_SHA`는 `versions/0.0.4/editor.js`가 포함된 릴리스의 40자리 커밋 SHA로 바꿉니다.
+아래 코드를 HTML 페이지에 넣으세요. CDN 주소는 확인한 0.0.4 릴리스 커밋으로 고정되어 있습니다.
 
 ```html
 <textarea id="content"><h2>첫 번째 문서</h2><p>여기서 시작하세요.</p></textarea>
@@ -29,7 +29,7 @@
   window.CONTENT_EDITOR_AUTOSTART = false;
   window.CONTENT_EDITOR_AUTOINIT = false;
 </script>
-<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@RELEASE_COMMIT_SHA/versions/0.0.4/editor.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@ba2b1a6097fa2c677d9a51499a9a5e332afe4fb5/versions/0.0.4/editor.js"></script>
 <script>
   const editor = window.mountContentEditor("#content", {
     lang: "ko",
