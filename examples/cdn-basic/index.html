@@ -1,153 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SolidEdit CDN Example</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --page-bg: #f5f7fb;
-      --surface: #ffffff;
-      --border: #d9e1ef;
-      --text: #0f172a;
-      --muted: #64748b;
-      --accent: #2563eb;
-      --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
-      --radius: 20px;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
-    body {
-      min-height: 100vh;
-      font: 16px/1.6 Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--page-bg);
-      color: var(--text);
-    }
-    .page {
-      max-width: 1180px;
-      margin: 0 auto;
-      padding: 32px 18px 48px;
-    }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 24px;
-    }
-    h1 {
-      margin: 0 0 8px;
-      font-size: 30px;
-      line-height: 1.2;
-    }
-    p.lead {
-      margin: 0 0 24px;
-      color: var(--muted);
-    }
-    .stack {
-      display: grid;
-      gap: 14px;
-    }
-    label {
-      display: grid;
-      gap: 8px;
-      font-weight: 600;
-    }
-    input[type="text"], textarea {
-      width: 100%;
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px 14px;
-      font: inherit;
-      background: #fff;
-      color: var(--text);
-    }
-    textarea {
-      min-height: 360px;
-      resize: vertical;
-    }
-    .note {
-      margin-top: 18px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-    code {
-      background: rgba(148, 163, 184, 0.16);
-      padding: 0.1em 0.4em;
-      border-radius: 8px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    }
-  </style>
-
-  <script>
-    window.CONTENT_EDITOR_AUTOSTART = false;
-    window.CONTENT_EDITOR_AUTOINIT = false;
-    window.CONTENT_EDITOR_ENABLE_CODEBLOCK = true;
-    window.CONTENT_EDITOR_CONFIG = Object.assign({
-      placeholder: "Write your content here."
-    }, window.CONTENT_EDITOR_CONFIG || {});
-    window.CONTENT_EDITOR_MATHJAX_CDN_URL =
-      window.CONTENT_EDITOR_MATHJAX_CDN_URL ||
-      "https://cdn.jsdelivr.net/gh/mathjax/MathJax@3.2.2/es5/tex-svg.js";
-    window.CONTENT_EDITOR_HLJS_SCRIPT_SRC =
-      window.CONTENT_EDITOR_HLJS_SCRIPT_SRC ||
-      "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js";
-    window.CONTENT_EDITOR_HLJS_STYLE_HREF =
-      window.CONTENT_EDITOR_HLJS_STYLE_HREF ||
-      "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css";
-  </script>
-
-  <!-- Immutable 0.0.3 release tag. Production consumers should prefer the verified 40-character commit SHA. -->
-  <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.3/versions/0.0.3/editor.js"></script>
-
-  <!-- Alternative moving latest channel -->
-  <!-- <script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/latest/editor.js"></script> -->
-
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SolidEdit — Full and Mini</title>
+<style>
+body{margin:0;background:#f4f6f8;color:#182234;font:16px/1.6 system-ui,sans-serif}main{max-width:1120px;margin:40px auto;padding:0 20px}h1{font-size:32px;margin-bottom:8px}p{margin:8px 0 24px;color:#526174}.modes{display:flex;gap:8px;margin:24px 0 12px}button{font:inherit;padding:8px 16px;border:1px solid #ced6df;border-radius:6px;background:white;color:inherit;cursor:pointer}button[aria-pressed=true]{color:#1859bd;background:#eaf1ff;border-color:#92b5ee}button:focus-visible{outline:2px solid #2563eb;outline-offset:3px}#mount{background:white}textarea{box-sizing:border-box;width:100%;min-height:240px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:20px;border:1px solid #dce2e8;border-radius:8px}details{margin-top:24px}summary{cursor:pointer}
+</style>
+<script>window.CONTENT_EDITOR_AUTOSTART=false;window.CONTENT_EDITOR_AUTOINIT=false;</script>
+<script src="../../versions/0.0.4/editor.js"></script>
 </head>
-<body>
-  <main class="page">
-    <section class="card">
-      <h1>SolidEdit CDN Example</h1>
-      <p class="lead">
-        This is a generic host-page example. It does not use any StatKISS-specific markup or globals.
-      </p>
-
-      <div class="stack">
-        <label for="postTitle">
-          Title
-          <input id="postTitle" type="text" placeholder="Enter a title" />
-        </label>
-
-        <label for="postBody">
-          Content
-          <textarea id="postBody" name="content" rows="18" placeholder="Write your content here."></textarea>
-        </label>
-      </div>
-
-      <p class="note">
-        The editor is mounted explicitly with <code>mountContentEditor("#postBody", ...)</code>.
-      </p>
-    </section>
-  </main>
-
-  <script>
-    window.addEventListener("DOMContentLoaded", function () {
-      if (typeof window.mountContentEditor !== "function") {
-        console.error("SolidEdit failed to load.");
-        return;
-      }
-
-      const editor = window.mountContentEditor("#postBody", {
-        placeholder: "Write your content here.",
-        titleField: "#postTitle",
-        storageKey: "solid-edit-cdn-example-0.0.3"
-      });
-
-      if (!editor) {
-        console.error("SolidEdit failed to mount on #postBody.");
-      }
-    });
-  </script>
-</body>
-</html>
+<body><main>
+<h1>A comfortable space to write</h1>
+<p>Full gives documents room to grow. Mini keeps comments and short notes compact. Both include the same editing tools.</p>
+<div class="modes" role="group" aria-label="Editor size"><button type="button" data-mode="full" aria-pressed="true">Full · Documents</button><button type="button" data-mode="mini" aria-pressed="false">Mini · Notes</button></div>
+<div id="mount"><textarea id="content"><h2>A small garden, a fresh start</h2><p>Our community garden is ready for the next season. <strong>Bring your ideas</strong>, choose a task, and help something grow.</p><blockquote>Good things grow when we make room for them.</blockquote><h3>Plan for Saturday</h3><table><thead><tr><th>Time</th><th>Activity</th></tr></thead><tbody><tr><td>09:00</td><td>Prepare the soil</td></tr><tr><td>10:00</td><td>Plant herbs and seedlings</td></tr></tbody></table><ul><li>Bring gloves and a water bottle.</li><li>Label each plant before watering.</li></ul><p>Learn more about the editor in the <a href="https://github.com/statground/solid-edit">SolidEdit repository</a>.</p></textarea></div>
+<p id="status" role="status" aria-live="polite"></p>
+<details><summary>See the document HTML</summary><button id="refresh" type="button">Refresh HTML</button><pre id="output"></pre></details>
+</main><script>
+let editor;
+function mount(mode){
+  const source=document.getElementById('content');
+  if(editor){source.value=editor.getHTML();window.destroyLocalRichEditor(editor);}
+  editor=window.mountContentEditor(source,{lang:'en',toolbarSize:mode,html:source.value,restoreDraft:false,storageKey:'solid-edit-example-0.0.4'});
+  document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===mode)));
+  document.getElementById('status').textContent=mode==='mini'?'Mini · Same document, compact writing area.':'Full · Your document grows as you write.';
+  window.demoEditor=editor;
+}
+document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>mount(button.dataset.mode)));
+document.getElementById('refresh').addEventListener('click',()=>document.getElementById('output').textContent=editor.getHTML());
+mount('full');
+</script></body></html>

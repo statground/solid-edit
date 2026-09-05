@@ -3,14 +3,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
+const crypto = require("node:crypto");
 
 const repoRoot = path.resolve(__dirname, "..");
-const latestPath = path.join(repoRoot, "latest", "editor.js");
 const versionPath = path.join(repoRoot, "versions", "0.0.3", "editor.js");
-const latest = fs.readFileSync(latestPath, "utf8");
 const version = fs.readFileSync(versionPath, "utf8");
 const patchMarker = "/* SolidEdit 0.0.3: always-visible tools and explicit mini mode. */";
-const patchSource = latest.slice(latest.lastIndexOf(patchMarker));
+const patchSource = version.slice(version.lastIndexOf(patchMarker));
 
 function createHarness() {
   const appendedStyles = [];
@@ -93,9 +92,9 @@ function createHarness() {
   };
 }
 
-test("the fixed 0.0.3 bundle matches latest at release time", () => {
-  assert.equal(version, latest);
-  assert.ok(latest.lastIndexOf(patchMarker) > latest.indexOf("window.mountContentEditor"));
+test("the fixed 0.0.3 bundle remains unchanged after newer releases", () => {
+  assert.equal(crypto.createHash("sha256").update(version).digest("hex"), "82696f66b61e2b88ce2a8d09a368db1d0c55e447014c77d14eea16370c2ced58");
+  assert.ok(version.lastIndexOf(patchMarker) > version.indexOf("window.mountContentEditor"));
 });
 
 test("full mode removes the ribbon toggle and exposes all tool groups", () => {

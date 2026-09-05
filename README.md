@@ -1,332 +1,104 @@
 # SolidEdit
 
-> A reusable, offline-first rich text editor for local files, embedded host pages, and CDN delivery.
+Write articles, meeting notes, and research documents with images, tables, code, and formulas. Embed the editor in a textarea with one JavaScript file.
 
----
+[한국어](README.ko.md) · [Try it on Statground](https://testgo.statground.net/toolbox/solid-edit/)
 
-## 🌐 Language
+## Choose your editing space
 
-- English (this file)
-- [한국어 README 보기](./README.ko.md)
+**0.0.4** introduces a flat toolbar, clear group separators, readable labels, and a consistent focus state. All editing tools stay visible in both modes.
 
----
+| | Full | Mini |
+|---|---|---|
+| Best for | Articles and documents | Comments and short notes |
+| Buttons / icons | 36px / 20px | 28px / 16px |
+| Writing space | Expands with the document | Scrolls within a compact area |
+| Tools and saved HTML | Same | Same |
 
-## Overview
+Switching density does not change the document format. Narrow screens wrap the tools onto additional rows.
 
-**SolidEdit 0.0.3** adds explicit full and mini interface modes to the stabilized reusable editor.
+![Full editor](docs/images/basic-layout.png)
 
-This release keeps the same product direction — local-first editing, predictable behavior, minimal host-page friction — but formalizes the project as a **generic embeddable editor** rather than a StatKISS-specific page script.
+## Start editing
 
-The current public documentation assumes:
-
-- `versions/0.0.3/editor.js` as the current fixed release path
-- exact commit SHA pinning in production
-- `latest/` as a moving development/evaluation channel only
-- a generic host-page API based on `mountContentEditor`, `initContentEditor`, and `CONTENT_EDITOR_*` globals
-- backward compatibility for older `STATKISS_*` host globals, without using that naming in public examples
-
----
-
-## 0.0.3 Release Highlights
-
-- Full mode is the default and shows every content tool immediately.
-- The ribbon expand/collapse control has been removed.
-- `toolbarSize: "mini"` keeps the same tools and saved HTML while using 32px buttons, 16px icons, and tighter toolbar spacing.
-- Mini mode fixes the toolbar at its compact size and hides the toolbar-size control.
-- Existing `mountContentEditor(...)` and `initContentEditor(...)` integrations remain compatible.
-
-See [CHANGELOG_0.0.3_vs_0.0.2.md](./CHANGELOG_0.0.3_vs_0.0.2.md) for the focused release comparison.
-
----
-
-## 0.0.2 Release Highlights
-
-- Generic embeddable public API
-- Stable CDN examples for both `latest/` and `versions/0.0.2/`
-- Context-aware inspector behavior for image, table, formula, and code block nodes
-- Caption support with numbering for image, table, formula, and code blocks
-- Image caption-as-alt behavior
-- More stable MathJax rendering and re-rendering
-- More stable code block insertion, highlighting, and raw-code preservation
-- Better mobile behavior for the embedded host layout
-
----
-
-## Feature Snapshot
-
-### Rich text editing
-- Bold, italic, underline, strike
-- Paragraph, H1, H2, H3
-- Blockquote
-- Ordered list, unordered list, checklist
-- Inline code
-- Link insertion
-- Clear formatting
-- Text color / background color
-- Horizontal rule
-
-### Markdown
-- Markdown panel toggle
-- Markdown source editing
-- Markdown apply / refresh flow
-- Split view support
-
-### Math
-- Inline and block formulas
-- MathJax rendering
-- Source preservation for existing formulas
-- Re-render after editing
-
-### Code blocks
-- Language selection
-- Highlight.js-based highlighting
-- Raw code preservation
-- Re-highlight after editing
-- Safer handling for previously broken unicode / injected markup cases
-
-### Media and structure
-- Image paste / upload / drag-and-drop
-- Base64 image handling with compression
-- Table insertion and table controls
-- Context-only inspector panels
-- Auto-save and snapshot history
-
----
-
-## Screenshots
-
-> The gallery below uses the accessible PNG captures available during the 0.0.2 stabilization cycle. They are already renamed to reusable documentation filenames under `docs/images/`.
-
-<p align="center">
-  <img src="./docs/images/basic-layout.png" alt="SolidEdit embedded layout example" width="49%">
-  <img src="./docs/images/code-block.png" alt="SolidEdit code block example" width="49%">
-</p>
-
-<p align="center">
-  <img src="./docs/images/formula-caption.png" alt="SolidEdit formula caption example" width="49%">
-  <img src="./docs/images/table-block.png" alt="SolidEdit table block example" width="49%">
-</p>
-
----
-
-## What changed from 0.0.1?
-
-This is mainly a **stabilization and packaging release** rather than a full conceptual rewrite.
-
-### 1. Public integration API was clarified
-Older documentation described a `window.SolidEdit.init(...)` style API.  
-For **0.0.2**, the public docs should use:
-
-- `window.mountContentEditor(target, options)`
-- `window.initContentEditor(options)`
-- `window.CONTENT_EDITOR_*` host globals
-
-The older `STATKISS_*` names are still treated as compatibility aliases, but they should not be used in public-facing examples.
-
-### 2. CDN release structure is now explicit
-The project now documents two channels:
-
-- `latest/` for the moving current build
-- `versions/0.0.2/` for the fixed 0.0.2 build
-
-### 3. Code blocks were stabilized
-Compared with the earlier 0.0.1 cycle, the 0.0.2 release emphasizes:
-
-- no duplicate code-block insertion
-- safer raw code retention
-- safer unicode handling
-- highlight re-application after edits
-- broader language support through Highlight.js delivery options
-
-### 4. Math rendering became more reliable
-The 0.0.2 release documents and preserves the path for:
-
-- first render on load
-- re-render after editing
-- preservation of stored formula source
-- better host-page setup for MathJax CDN configuration
-
-### 5. Inspector behavior became more predictable
-The 0.0.2 cycle focused heavily on:
-
-- removing unstable click-to-select behavior
-- keeping the selected node from immediately losing inspector state
-- avoiding generic always-open inspector sections
-- cleaning up duplicate / accidental inspector controls
-
-### 6. Caption support was expanded
-0.0.2 adds or formalizes:
-
-- image captions with numbering
-- table captions with numbering
-- formula captions with numbering
-- code-block captions with numbering
-- image caption reuse as accessible alt text
-
-### 7. Mobile and host integration improved
-This release is more deliberate about:
-
-- keeping host-page `index.html` minimal
-- moving editor logic into the editor bundle or host integration script
-- making the embedded layout friendlier on smaller screens
-
-For a condensed comparison list, see [CHANGELOG_0.0.2_vs_0.0.1.md](./CHANGELOG_0.0.2_vs_0.0.1.md).
-
----
-
-## Repository Layout
-
-A practical 0.0.3 repository layout can look like this:
-
-```text
-solid-edit/
-├── README.md
-├── README.ko.md
-├── CHANGELOG_0.0.3_vs_0.0.2.md
-├── CHANGELOG_0.0.2_vs_0.0.1.md
-├── CHATGPT_PROJECT_INSTRUCTIONS.ko.md
-├── docs/
-│   └── images/
-│       ├── basic-layout.png
-│       ├── code-block.png
-│       ├── formula-caption.png
-│       └── table-block.png
-├── examples/
-│   └── cdn-basic/
-│       └── index.html
-├── latest/
-│   └── editor.js
-└── versions/
-    ├── 0.0.2/
-    │   └── editor.js
-    └── 0.0.3/
-        └── editor.js
-```
-
----
-
-## CDN Paths
-
-### Production pin
-
-Replace the placeholder with the verified 40-character release commit SHA:
+Copy this into an HTML page. Replace `RELEASE_COMMIT_SHA` with the 40-character commit containing the `versions/0.0.4/editor.js` bundle.
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@<40-character-commit-sha>/versions/0.0.3/editor.js"></script>
+<textarea id="content"><h2>My first document</h2><p>Start here.</p></textarea>
+<script>
+  window.CONTENT_EDITOR_AUTOSTART = false;
+  window.CONTENT_EDITOR_AUTOINIT = false;
+</script>
+<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@RELEASE_COMMIT_SHA/versions/0.0.4/editor.js"></script>
+<script>
+  const editor = window.mountContentEditor("#content", {
+    lang: "en",
+    toolbarSize: "full",
+    restoreDraft: false,
+    storageKey: "my-document-draft"
+  });
+</script>
 ```
 
-### Immutable 0.0.3 release tag
+For a compact comment editor, pass `toolbarSize: "mini"`. Mini uses a 160px minimum and a 320px maximum writing height by default. Full starts at 320px and grows with its content. Set numeric `minHeight` and `maxHeight` options when your host needs another size.
 
-```html
-<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@0.0.3/versions/0.0.3/editor.js"></script>
-```
-
-### Moving development channel
-
-Do not use this URL in production:
-
-```html
-<script src="https://cdn.jsdelivr.net/gh/statground/solid-edit@main/latest/editor.js"></script>
-```
-
----
-
-## Public API
-
-### Explicit mount
-```javascript
-window.mountContentEditor(target, options);
-```
-
-Typical usage:
-
-```javascript
-window.mountContentEditor("#postBody", {
-  placeholder: "Write your content here.",
-  titleField: "#postTitle",
-  storageKey: "solid-edit-demo-0.0.3"
-});
-```
-
-`full` is the default. It always shows every available content tool and has no expand/collapse control.
-
-### Mini toolbar
-
-Use mini mode for compact surfaces such as comments and replies:
-
-```javascript
-window.mountContentEditor("#commentBody", {
+```js
+const comment = window.mountContentEditor("#comment", {
   toolbarSize: "mini",
-  placeholder: "Write a comment."
+  placeholder: "Add a comment…",
+  minHeight: 160,
+  maxHeight: 320,
+  storageKey: "my-comment-draft"
 });
 ```
 
-Mini mode changes toolbar density only. It preserves the same tool set, public API, and saved HTML contract as full mode.
+Open [the complete Full/Mini example](examples/cdn-basic/index.html) from a local web server to try both modes. The checked-in example loads the bundled release; its script URL can be replaced with your pinned CDN URL.
 
-### Auto-init / observer-based mount
-```javascript
-window.initContentEditor({
-  target: "#postBody"
-});
+## What can I put in a document?
+
+- **Text:** headings, bold, italic, underline, strike, inline code, text color, and highlights.
+- **Structure:** paragraphs, quotes, lists, checklists, alignment, and dividers.
+- **Images:** upload, paste, or drag an image into the document; then adjust its size and caption.
+- **Tables:** insert a table and select it to edit its rows, columns, and caption.
+- **Code:** choose a language and keep the original code alongside highlighted output.
+- **Formulas:** write inline or block LaTeX and keep the original formula for later editing.
+- **Markdown:** inspect or edit the source and use split view while writing.
+
+Select an image, table, code block, or formula to open its contextual controls. Hover a toolbar button for its name; keyboard focus remains visible.
+
+## Read, replace, and remove
+
+```js
+const html = editor.getHTML();           // Save the rich document
+const markdown = editor.getMarkdown(); // Export Markdown
+editor.setHTML("<h2>Updated</h2><p>Keep writing.</p>");
+window.destroyLocalRichEditor(editor); // Unmount before removing the host
 ```
 
----
+HTML retains rich formatting. Markdown cannot represent every visual property, such as image sizing, color, or table styling.
 
-## Generic host globals
+Drafts use browser storage. Give separate documents distinct `storageKey` values. `restoreDraft: false` starts from the supplied content; it does not disable later draft writes. Save `getHTML()` through your application when users submit their work.
 
-Public examples should use the **generic** host globals:
+## Code and formula rendering
 
-```javascript
-window.CONTENT_EDITOR_AUTOSTART = false;
-window.CONTENT_EDITOR_AUTOINIT = false;
-window.CONTENT_EDITOR_CONFIG = {
-  placeholder: "Write your content here."
-};
-window.CONTENT_EDITOR_MATHJAX_CDN_URL = "https://cdn.jsdelivr.net/gh/mathjax/MathJax@3.2.2/es5/tex-svg.js";
-window.CONTENT_EDITOR_HLJS_SCRIPT_SRC = "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js";
-window.CONTENT_EDITOR_HLJS_STYLE_HREF = "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css";
+SolidEdit supports Highlight.js and MathJax. Configure their locations before loading the editor when your application owns dependency loading:
+
+```js
+window.CONTENT_EDITOR_ENABLE_CODEBLOCK = true;
+window.CONTENT_EDITOR_HLJS_SCRIPT_SRC = "YOUR_PINNED_HIGHLIGHT_JS_URL";
+window.CONTENT_EDITOR_HLJS_STYLE_HREF = "YOUR_PINNED_HIGHLIGHT_CSS_URL";
+window.CONTENT_EDITOR_MATHJAX_CDN_URL = "YOUR_PINNED_MATHJAX_TEX_SVG_URL";
 ```
 
-Legacy `STATKISS_*` globals remain compatibility aliases for older host pages, but they are not the recommended public naming for SolidEdit documentation.
+Host applications with a Content Security Policy must permit these assets and image data URLs. The [Statground setup example](https://testgo.statground.net/toolbox/solid-edit/#setup) includes the complete pinned renderer setup. Existing code and formula sources are retained in the document.
 
----
+## Files and compatibility
 
-## Basic CDN Example
+- `versions/0.0.4/editor.js`: current release bundle.
+- `latest/editor.js`: the same bundle at release time; this path changes during development.
+- `versions/0.0.3/editor.js`: previous release, retained unchanged.
+- `tests/`: Node contracts and a browser fixture.
 
-A standalone generic example is included at:
+Pin a commit SHA for deployed applications. Use `latest/` only for development. The public APIs are `mountContentEditor`, `initContentEditor`, and the `CONTENT_EDITOR_*` globals. Older `STATKISS_*` names remain compatibility aliases.
 
-```text
-examples/cdn-basic/index.html
-```
-
-It demonstrates:
-
-- a neutral host page
-- a title field
-- a textarea target
-- explicit `mountContentEditor(...)`
-- generic `CONTENT_EDITOR_*` configuration
-- the immutable 0.0.3 release tag and default full-mode mount
-
----
-
-## Notes for self-hosting
-
-If you self-host the editor instead of using jsDelivr:
-
-- keep the editor bundle path stable
-- keep host-page globals generic
-- keep the example and README aligned with the actual exported API
-- do not document `window.SolidEdit.init(...)` unless the bundle really exports it
-
----
-
-## License
-
-MIT
-
----
-
-## Author
-
-**Statground**
+MIT · Statground
